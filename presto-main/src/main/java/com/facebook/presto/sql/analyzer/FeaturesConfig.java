@@ -66,6 +66,8 @@ public class FeaturesConfig
     private Path spillerSpillPath = Paths.get(System.getProperty("java.io.tmpdir"), "presto", "spills");
     private int spillerThreads = 4;
 
+    private boolean enableCalcite = true;
+
     public boolean isResourceGroupsEnabled()
     {
         return resourceGroups;
@@ -309,6 +311,18 @@ public class FeaturesConfig
     public FeaturesConfig setOptimizeMixedDistinctAggregations(boolean value)
     {
         this.optimizeMixedDistinctAggregations = value;
+        return this;
+    }
+
+    public boolean isEnableCalcite()
+    {
+        return enableCalcite;
+    }
+
+    @Config("optimizer.enable-calcite")
+    public FeaturesConfig setEnableCalcite(boolean value)
+    {
+        enableCalcite = value;
         return this;
     }
 }

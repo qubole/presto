@@ -52,6 +52,7 @@ import com.facebook.presto.sql.planner.optimizations.TransformUncorrelatedInPred
 import com.facebook.presto.sql.planner.optimizations.TransformUncorrelatedScalarToJoin;
 import com.facebook.presto.sql.planner.optimizations.UnaliasSymbolReferences;
 import com.facebook.presto.sql.planner.optimizations.WindowFilterPushDown;
+import com.facebook.presto.sql.planner.optimizations.calcite.CalciteOptimizer;
 import com.google.common.collect.ImmutableList;
 import com.google.inject.Inject;
 
@@ -73,6 +74,7 @@ public class PlanOptimizers
 
         builder.add(
                 new DesugaringOptimizer(metadata, sqlParser), // Clean up all the sugar in expressions, e.g. AtTimeZone, must be run before all the other optimizers
+                new CalciteOptimizer(metadata),
                 new ImplementFilteredAggregations(),
                 new ImplementSampleAsFilter(),
                 new CanonicalizeExpressions(),

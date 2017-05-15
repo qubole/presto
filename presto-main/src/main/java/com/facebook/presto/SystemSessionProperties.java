@@ -65,6 +65,8 @@ public final class SystemSessionProperties
     public static final String OPERATOR_MEMORY_LIMIT_BEFORE_SPILL = "operator_memory_limit_before_spill";
     public static final String OPTIMIZE_DISTINCT_AGGREGATIONS = "optimize_mixed_distinct_aggregations";
 
+    public static final String ENABLE_CALCITE = "enable_calcite";
+
     private final List<PropertyMetadata<?>> sessionProperties;
 
     public SystemSessionProperties()
@@ -253,7 +255,12 @@ public final class SystemSessionProperties
                         OPTIMIZE_DISTINCT_AGGREGATIONS,
                         "Optimize mixed non-distinct and distinct aggregations",
                         featuresConfig.isOptimizeMixedDistinctAggregations(),
-                        false));
+                        false),
+                booleanSessionProperty(
+                        ENABLE_CALCITE,
+                        "Enable calcite optimzer",
+                        featuresConfig.isEnableCalcite(),
+                        true));
     }
 
     public List<PropertyMetadata<?>> getSessionProperties()
@@ -393,5 +400,10 @@ public final class SystemSessionProperties
     public static boolean isOptimizeDistinctAggregationEnabled(Session session)
     {
         return session.getSystemProperty(OPTIMIZE_DISTINCT_AGGREGATIONS, Boolean.class);
+    }
+
+    public static boolean isEnableCalcite(Session session)
+    {
+        return session.getSystemProperty(ENABLE_CALCITE, Boolean.class);
     }
 }

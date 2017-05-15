@@ -70,8 +70,8 @@ public final class DateTimeUtils
         return DATE_FORMATTER.print(TimeUnit.DAYS.toMillis(days));
     }
 
-    private static final DateTimeFormatter TIMESTAMP_WITHOUT_TIME_ZONE_FORMATTER;
-    private static final DateTimeFormatter TIMESTAMP_WITH_TIME_ZONE_FORMATTER;
+    public static final DateTimeFormatter TIMESTAMP_WITHOUT_TIME_ZONE_FORMATTER;
+    public static final DateTimeFormatter TIMESTAMP_WITH_TIME_ZONE_FORMATTER;
     private static final DateTimeFormatter TIMESTAMP_WITH_OR_WITHOUT_TIME_ZONE_FORMATTER;
 
     static {
@@ -168,8 +168,8 @@ public final class DateTimeUtils
         }
     }
 
-    private static final DateTimeFormatter TIME_FORMATTER;
-    private static final DateTimeFormatter TIME_WITH_TIME_ZONE_FORMATTER;
+    public static final DateTimeFormatter TIME_FORMATTER;
+    public static final DateTimeFormatter TIME_WITH_TIME_ZONE_FORMATTER;
 
     static {
         DateTimeParser[] timeWithoutTimeZoneParser = {
