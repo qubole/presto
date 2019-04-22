@@ -13,12 +13,28 @@
  */
 package com.facebook.presto.hive.metastore.thrift;
 
+import com.google.common.collect.Lists;
+import io.airlift.log.Logger;
+import org.apache.hadoop.hive.common.ValidTxnList;
+import org.apache.hadoop.hive.metastore.api.AbortTxnRequest;
+import org.apache.hadoop.hive.metastore.api.AllocateTableWriteIdsRequest;
+import org.apache.hadoop.hive.metastore.api.CheckLockRequest;
+import org.apache.hadoop.hive.metastore.api.ClientCapabilities;
+import org.apache.hadoop.hive.metastore.api.ClientCapability;
 import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsDesc;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
+import org.apache.hadoop.hive.metastore.api.CommitTxnRequest;
 import org.apache.hadoop.hive.metastore.api.Database;
+import org.apache.hadoop.hive.metastore.api.GetTableRequest;
+import org.apache.hadoop.hive.metastore.api.GetValidWriteIdsRequest;
+import org.apache.hadoop.hive.metastore.api.HeartbeatTxnRangeRequest;
+import org.apache.hadoop.hive.metastore.api.HeartbeatTxnRangeResponse;
 import org.apache.hadoop.hive.metastore.api.HiveObjectPrivilege;
 import org.apache.hadoop.hive.metastore.api.HiveObjectRef;
+import org.apache.hadoop.hive.metastore.api.LockRequest;
+import org.apache.hadoop.hive.metastore.api.LockResponse;
+import org.apache.hadoop.hive.metastore.api.OpenTxnRequest;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.PartitionsStatsRequest;
 import org.apache.hadoop.hive.metastore.api.PrincipalPrivilegeSet;
@@ -28,15 +44,21 @@ import org.apache.hadoop.hive.metastore.api.Role;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.TableStatsRequest;
 import org.apache.hadoop.hive.metastore.api.ThriftHiveMetastore;
+import org.apache.hadoop.hive.metastore.api.TxnToWriteId;
+import org.apache.hadoop.hive.metastore.txn.TxnUtils;
+import org.apache.thrift.TApplicationException;
 import org.apache.thrift.TException;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.protocol.TProtocol;
 import org.apache.thrift.transport.TTransport;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import static com.google.common.base.Throwables.propagate;
 import static java.util.Objects.requireNonNull;
 
 public class ThriftHiveMetastoreClient
@@ -44,6 +66,10 @@ public class ThriftHiveMetastoreClient
 {
     private final TTransport transport;
     private final ThriftHiveMetastore.Client client;
+
+    private static final Logger log = Logger.get(ThriftHiveMetastoreClient.class);
+    public static final ClientCapabilities INSERT_ONLY_TABLES = new ClientCapabilities(
+            Lists.newArrayList(ClientCapability.INSERT_ONLY_TABLES, ClientCapability.TEST_CAPABILITY));
 
     public ThriftHiveMetastoreClient(TTransport transport)
     {
@@ -137,7 +163,17 @@ public class ThriftHiveMetastoreClient
     public Table getTable(String databaseName, String tableName)
             throws TException
     {
-        return client.get_table(databaseName, tableName);
+        try {
+            GetTableRequest req = new GetTableRequest(databaseName, tableName);
+            req.setCapabilities(INSERT_ONLY_TABLES);
+            return client.get_table_req(req).getTable();
+        }
+        catch (TApplicationException ex) {
+            if (ex.getMessage().contains("Invalid method name")) {
+                return client.get_table(databaseName, tableName);
+            }
+            throw ex;
+        }
     }
 
     @Override
@@ -285,5 +321,82 @@ public class ThriftHiveMetastoreClient
             throws TException
     {
         client.set_ugi(userName, new ArrayList<>());
+    }
+
+    @Override
+    public long openTxn(String user)
+            throws TException
+    {
+        String hostname;
+        try {
+            hostname = InetAddress.getLocalHost().getHostName();
+        }
+        catch (UnknownHostException e) {
+            throw propagate(e);
+        }
+
+        OpenTxnRequest request = new OpenTxnRequest(1, user, hostname);
+        return client.open_txns(request).getTxn_ids().get(0);
+    }
+
+    @Override
+    public void commitTxn(long txnId)
+            throws TException
+    {
+        client.commit_txn(new CommitTxnRequest(txnId));
+    }
+
+    @Override
+    public void rollbackTxn(long txnId)
+            throws TException
+    {
+        client.abort_txn(new AbortTxnRequest(txnId));
+    }
+
+    @Override
+    public boolean sendTxnHeartBeatAndFindIfValid(long txn)
+            throws TException
+    {
+        HeartbeatTxnRangeRequest rqst = new HeartbeatTxnRangeRequest(txn, txn);
+        HeartbeatTxnRangeResponse response = client.heartbeat_txn_range(rqst);
+        if (!response.getAborted().isEmpty() || !response.getNosuch().isEmpty()) {
+            log.error(String.format("Heartbeat failure for txn %d: [%s]", txn, response.toString()));
+            return false;
+        }
+        log.debug("Heartbeat successful for " + txn);
+        return true;
+    }
+
+    @Override
+    public LockResponse acquireLock(LockRequest lockRequest)
+            throws TException
+    {
+        return client.lock(lockRequest);
+    }
+
+    @Override
+    public LockResponse checkLock(long lockId)
+            throws TException
+    {
+        return client.check_lock(new CheckLockRequest(lockId));
+    }
+    @Override
+    public String getValidWriteIds(List<String> tableList, long currentTxn)
+            throws TException
+    {
+        ValidTxnList validTxns = TxnUtils.createValidReadTxnList(client.get_open_txns(), currentTxn);
+        GetValidWriteIdsRequest rqst = new GetValidWriteIdsRequest(tableList, validTxns.toString());
+        return TxnUtils.createValidTxnWriteIdList(
+                currentTxn,
+                client.get_valid_write_ids(rqst).getTblValidWriteIds())
+                .toString();
+    }
+
+    // This is there for tests only, Presto does not yet support writing to Hive Transactional tables
+    @Override
+    public List<TxnToWriteId> allocateTableWriteIdsBatchIntr(AllocateTableWriteIdsRequest rqst)
+            throws TException
+    {
+        return client.allocate_table_write_ids(rqst).getTxnToWriteIds();
     }
 }

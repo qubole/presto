@@ -1397,6 +1397,8 @@ public class HiveMetadata
     {
         HiveTableHandle handle = (HiveTableHandle) tableHandle;
         HivePartitionResult hivePartitionResult = partitionManager.getPartitions(metastore, tableHandle, constraint);
+        List<HivePartition> hivePartitions = getPartitionsAsList(hivePartitionResult);
+        metastore.partitionsToBeRead(handle, hivePartitions);
 
         return ImmutableList.of(new ConnectorTableLayoutResult(
                 getTableLayout(
@@ -1404,7 +1406,7 @@ public class HiveMetadata
                         new HiveTableLayoutHandle(
                                 handle.getSchemaTableName(),
                                 ImmutableList.copyOf(hivePartitionResult.getPartitionColumns()),
-                                getPartitionsAsList(hivePartitionResult),
+                                hivePartitions,
                                 hivePartitionResult.getCompactEffectivePredicate(),
                                 hivePartitionResult.getEnforcedConstraint(),
                                 hivePartitionResult.getBucketHandle(),
@@ -1795,5 +1797,17 @@ public class HiveMetadata
         return new SchemaTableName(
                 tableName.getSchemaName(),
                 tableName.getTableName().substring(0, tableName.getTableName().length() - PARTITIONS_TABLE_SUFFIX.length()));
+    }
+
+    @Override
+    public void beginQuery(ConnectorSession session)
+    {
+        metastore.beginQuery(session);
+    }
+
+    @Override
+    public void cleanupQuery(ConnectorSession session)
+    {
+        metastore.cleanupQuery(session);
     }
 }

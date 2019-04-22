@@ -1,0 +1,30 @@
+hdfs:
+  username: hdfs
+  webhdfs:
+    host: ${databases.hive.host}
+    port: 9870  # hadoop3 has UI on 9870
+
+databases:
+  hive:
+    host: hadoop-master
+    jdbc_driver_class: org.apache.hive3.jdbc.HiveDriver
+    jdbc_url: jdbc:hive2://${databases.hive.host}:10000/default;auth=noSasl   # noSasl auth is a must for hive3
+    jdbc_user: hive
+    jdbc_password: na
+    jdbc_pooling: false
+    schema: default
+    prepare_statement: USE ${databases.hive.schema}
+    table_manager_type: hive
+    warehouse_directory_path: /user/hive/warehouse
+    path: /user/hive/warehouse
+    inject_stats_for_immutable_tables: true
+    inject_stats_for_mutable_tables: true
+    metastore:
+      host: ${databases.hive.host}
+      port: 9083
+
+  presto:
+    host: presto-master
+    # Current hdp3-hive3 image is baked with hive.server2.doAs=false. So use hive user everywhere
+    jdbc_user: hive
+    configured_hdfs_user: hive

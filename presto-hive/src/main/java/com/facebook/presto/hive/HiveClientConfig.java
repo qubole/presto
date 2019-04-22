@@ -138,6 +138,8 @@ public class HiveClientConfig
     private int partitionStatisticsSampleSize = 100;
     private boolean collectColumnStatisticsOnWrite;
 
+    private Duration hiveTxnHeartBeatInterval = new Duration(5, TimeUnit.SECONDS);
+
     public int getMaxInitialSplits()
     {
         return maxInitialSplits;
@@ -1087,5 +1089,18 @@ public class HiveClientConfig
     {
         this.collectColumnStatisticsOnWrite = collectColumnStatisticsOnWrite;
         return this;
+    }
+
+    @Config("hive.txn-heartbeat-interval")
+    @ConfigDescription("Interval after which heartbeat is sent for open Hive transaction")
+    public HiveClientConfig setHiveTxnHeartBeatInterval(Duration interval)
+    {
+        this.hiveTxnHeartBeatInterval = interval;
+        return this;
+    }
+
+    public Duration getHiveTxnHeartBeatInterval()
+    {
+        return hiveTxnHeartBeatInterval;
     }
 }

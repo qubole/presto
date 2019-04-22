@@ -39,6 +39,8 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.common.ValidTxnWriteIdList;
+import org.apache.hadoop.hive.ql.io.AcidUtils;
 import org.apache.hadoop.hive.ql.io.SymlinkTextInputFormat;
 import org.apache.hadoop.mapred.FileInputFormat;
 import org.apache.hadoop.mapred.FileSplit;
@@ -127,6 +129,8 @@ public class BackgroundHiveSplitLoader
     private HiveSplitSource hiveSplitSource;
     private volatile boolean stopped;
 
+    private String validWriteIds;
+
     public BackgroundHiveSplitLoader(
             Table table,
             Iterable<HivePartitionMetadata> partitions,
@@ -138,7 +142,8 @@ public class BackgroundHiveSplitLoader
             DirectoryLister directoryLister,
             Executor executor,
             int loaderConcurrency,
-            boolean recursiveDirWalkerEnabled)
+            boolean recursiveDirWalkerEnabled,
+            String validWriteIds)
     {
         this.table = table;
         this.compactEffectivePredicate = compactEffectivePredicate;
@@ -152,6 +157,7 @@ public class BackgroundHiveSplitLoader
         this.executor = executor;
         this.partitions = new ConcurrentLazyQueue<>(partitions);
         this.hdfsContext = new HdfsContext(session, table.getDatabaseName(), table.getTableName());
+        this.validWriteIds = validWriteIds;
     }
 
     @Override
@@ -356,7 +362,34 @@ public class BackgroundHiveSplitLoader
         }
 
         boolean splittable = getHeaderCount(schema) == 0 && getFooterCount(schema) == 0;
-        fileIterators.addLast(createInternalHiveSplitIterator(path, fs, splitFactory, splittable));
+        if (!AcidUtils.isTransactionalTable(table.getParameters())) {
+            fileIterators.addLast(createInternalHiveSplitIterator(path, fs, splitFactory, splittable));
+        }
+        else {
+            if (AcidUtils.isFullAcidTable(table.getParameters())) {
+                throw new PrestoException(NOT_SUPPORTED, format("Reading from Full ACID tables are not supported: %s.%s", table.getDatabaseName(), table.getTableName()));
+            }
+
+            // Now we should only have insert only table
+            checkState(AcidUtils.isInsertOnlyTable(table.getParameters()), String.format("Unknown transactional table type [%s] : neither Insert Only nor Full ACID", table.getTableName()));
+            AcidUtils.Directory directory = AcidUtils.getAcidState(
+                    path,
+                    configuration,
+                    new ValidTxnWriteIdList(validWriteIds)
+                            .getTableValidWriteIdList(
+                                    table.getDatabaseName() + "." + table.getTableName()),
+                    false,
+                    true);
+            // delta directories
+            for (AcidUtils.ParsedDelta delta : directory.getCurrentDirectories()) {
+                fileIterators.addLast(createInternalHiveSplitIterator(delta.getPath(), fs, splitFactory, splittable));
+            }
+
+            // base
+            if (directory.getBaseDirectory() != null) {
+                fileIterators.addLast(createInternalHiveSplitIterator(directory.getBaseDirectory(), fs, splitFactory, splittable));
+            }
+        }
         return COMPLETED_FUTURE;
     }
 

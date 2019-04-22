@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.hive.metastore.thrift;
 
+import com.facebook.presto.hive.HivePartition;
 import com.facebook.presto.hive.HiveType;
 import com.facebook.presto.hive.HiveUtil;
 import com.facebook.presto.hive.PartitionNotFoundException;
@@ -350,5 +351,41 @@ public class BridgingHiveMetastore
                 .map(privilege -> toMetastoreApiPrivilegeGrantInfo(grantee, privilege))
                 .collect(Collectors.toSet());
         delegate.revokeTablePrivileges(databaseName, tableName, grantee, privilegeGrantInfos);
+    }
+
+    @Override
+    public long openTxn(String user)
+    {
+        return delegate.openTxn(user);
+    }
+
+    @Override
+    public void commitTxn(long txnId)
+    {
+        delegate.commitTxn(txnId);
+    }
+
+    @Override
+    public void rollbackTxn(long txnId)
+    {
+        delegate.rollbackTxn(txnId);
+    }
+
+    @Override
+    public boolean sendTxnHeartBeatAndFindIfValid(long txn)
+    {
+        return delegate.sendTxnHeartBeatAndFindIfValid(txn);
+    }
+
+    @Override
+    public void acquireSharedReadLock(String user, String queryId, long txn, Set<HivePartition> partitions)
+    {
+        delegate.acquireSharedReadLock(user, queryId, txn, partitions);
+    }
+
+    @Override
+    public String getValidWriteIds(List<String> tableList, long currentTxn)
+    {
+        return delegate.getValidWriteIds(tableList, currentTxn);
     }
 }

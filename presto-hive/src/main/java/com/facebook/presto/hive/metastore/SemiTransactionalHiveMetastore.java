@@ -15,6 +15,8 @@ package com.facebook.presto.hive.metastore;
 
 import com.facebook.presto.hive.HdfsEnvironment;
 import com.facebook.presto.hive.HdfsEnvironment.HdfsContext;
+import com.facebook.presto.hive.HivePartition;
+import com.facebook.presto.hive.HiveTableHandle;
 import com.facebook.presto.hive.HiveType;
 import com.facebook.presto.hive.LocationHandle.WriteMode;
 import com.facebook.presto.hive.PartitionNotFoundException;
@@ -34,11 +36,13 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.airlift.concurrent.MoreFutures;
 import io.airlift.log.Logger;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.ql.io.AcidUtils;
 
 import javax.annotation.concurrent.GuardedBy;
 
@@ -54,6 +58,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
@@ -61,7 +67,9 @@ import static com.facebook.presto.hive.HiveErrorCode.HIVE_FILESYSTEM_ERROR;
 import static com.facebook.presto.hive.HiveErrorCode.HIVE_METASTORE_ERROR;
 import static com.facebook.presto.hive.HiveErrorCode.HIVE_PATH_ALREADY_EXISTS;
 import static com.facebook.presto.hive.HiveErrorCode.HIVE_TABLE_DROPPED_DURING_QUERY;
+import static com.facebook.presto.hive.HiveErrorCode.HIVE_TABLE_TXN_ABORTED_BY_MS;
 import static com.facebook.presto.hive.HiveMetadata.PRESTO_QUERY_ID_NAME;
+import static com.facebook.presto.hive.HiveSessionProperties.getHiveTxnHeartBeatInterval;
 import static com.facebook.presto.hive.HiveUtil.toPartitionValues;
 import static com.facebook.presto.hive.HiveWriteUtils.createDirectory;
 import static com.facebook.presto.hive.HiveWriteUtils.pathExists;
@@ -103,6 +111,12 @@ public class SemiTransactionalHiveMetastore
     @GuardedBy("this")
     private State state = State.EMPTY;
     private boolean throwOnCleanupFailure;
+    @GuardedBy("this")
+    private final Set<HivePartition> transactionalPartitionsRead = new HashSet();
+
+    // New HiveACIDState is created for each query
+    private HiveACIDState hiveACIDState;
+    private ScheduledExecutorService heartBeater;
 
     public SemiTransactionalHiveMetastore(HdfsEnvironment hdfsEnvironment, ExtendedHiveMetastore delegate, Executor renameExecutor, boolean skipDeletionForAlter)
     {
@@ -110,6 +124,10 @@ public class SemiTransactionalHiveMetastore
         this.delegate = requireNonNull(delegate, "delegate is null");
         this.renameExecutor = requireNonNull(renameExecutor, "renameExecutor is null");
         this.skipDeletionForAlter = requireNonNull(skipDeletionForAlter, "skipDeletionForAlter is null");
+        heartBeater = Executors.newSingleThreadScheduledExecutor(
+                new ThreadFactoryBuilder().setDaemon(true)
+                        .setNameFormat(String.format("Hive-Txn_Heartbeat-Thread"))
+                        .build());
     }
 
     public synchronized List<String> getAllDatabases()
@@ -215,6 +233,84 @@ public class SemiTransactionalHiveMetastore
             partitionNamesToQuery.build().forEach(partitionName -> resultBuilder.put(partitionName, PartitionStatistics.empty()));
         }
         return resultBuilder.build();
+    }
+
+    public synchronized void partitionsToBeRead(HiveTableHandle handle, List<HivePartition> partitions)
+    {
+        Optional<Table> table = getTable(handle.getSchemaName(), handle.getTableName());
+        checkArgument(table.isPresent(), "Table not found: " + handle.getSchemaTableName());
+
+        if (AcidUtils.isFullAcidTable(table.get().getParameters())) {
+            // new exception
+            throw new PrestoException(NOT_SUPPORTED, format("Reading from Full ACID tables are not supported: %s.%s", table.get().getDatabaseName(), table.get().getTableName()));
+        }
+        if (AcidUtils.isInsertOnlyTable(table.get().getParameters())) {
+            transactionalPartitionsRead.addAll(partitions);
+        }
+    }
+
+    public synchronized void beginQuery(ConnectorSession session)
+    {
+        hiveACIDState = new HiveACIDState(getHiveTxnHeartBeatInterval(session));
+
+        if (transactionalPartitionsRead.isEmpty()) {
+            return;
+        }
+
+        hiveACIDState.setTxnId(delegate.openTxn(session.getUser()), session);
+        log.info("Using hive trasaction %s for QueryId: %s", hiveACIDState.getTxnId(), session.getQueryId());
+
+        hiveACIDState.setHeartBeatTask(heartBeater, delegate);
+
+        // Take locks on all the partitions that query will use and reset the partitions list for next query in the Presto Transaction
+        try {
+            delegate.acquireSharedReadLock(session.getUser(), session.getQueryId(), hiveACIDState.getTxnId(), transactionalPartitionsRead);
+            log.warn("REMOVE: got lock for query: " + session.getQueryId());
+
+            Set<String> tables = new HashSet();
+            for (HivePartition partition : transactionalPartitionsRead) {
+                tables.add(partition.getTableName().toString());
+            }
+            hiveACIDState.setValidWriteIds(delegate.getValidWriteIds(ImmutableList.copyOf(tables), hiveACIDState.getTxnId()));
+        }
+        finally {
+            // Clear it for the next query in the Presto transaction
+            transactionalPartitionsRead.clear();
+        }
+    }
+
+    public String getValidWriteIds()
+    {
+        if (hiveACIDState == null) {
+            return "";
+        }
+
+        return hiveACIDState.getValidWriteIds();
+    }
+
+    public synchronized void cleanupQuery(ConnectorSession session)
+    {
+        if (!hiveACIDState.isTxnOpen()) {
+            return;
+        }
+
+        hiveACIDState.endHeartBeat(session);
+
+        if (!hiveACIDState.isTrasactionValidAtMetastore()) {
+            try {
+                delegate.rollbackTxn(hiveACIDState.getTxnId());
+                log.info("Rolled back hive trasaction %s for QueryId: %s", hiveACIDState.getTxnId(), session.getQueryId());
+            }
+            catch (Exception e) {
+                log.warn("Error rolling back hive trasaction %s for QueryId: %s", hiveACIDState.getTxnId(), session.getQueryId());
+            }
+
+            throw new PrestoException(HIVE_TABLE_TXN_ABORTED_BY_MS, String.format("Transaction %d was aborted by Hive Metastore", hiveACIDState.getTxnId()));
+        }
+
+        // Commiting READ txn for successful or failed queries
+        delegate.commitTxn(hiveACIDState.getTxnId());
+        log.info("Committed hive trasaction %s for QueryId: %s", hiveACIDState.getTxnId(), session.getQueryId());
     }
 
     /**
@@ -797,6 +893,7 @@ public class SemiTransactionalHiveMetastore
 
     public synchronized void commit()
     {
+        heartBeater.shutdownNow();
         try {
             switch (state) {
                 case EMPTY:
@@ -821,6 +918,7 @@ public class SemiTransactionalHiveMetastore
 
     public synchronized void rollback()
     {
+        heartBeater.shutdownNow();
         try {
             switch (state) {
                 case EMPTY:

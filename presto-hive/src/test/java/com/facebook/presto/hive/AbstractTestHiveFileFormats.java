@@ -54,7 +54,7 @@ import org.apache.hadoop.hive.common.type.HiveDecimal;
 import org.apache.hadoop.hive.common.type.HiveVarchar;
 import org.apache.hadoop.hive.ql.exec.FileSinkOperator.RecordWriter;
 import org.apache.hadoop.hive.ql.io.HiveOutputFormat;
-import org.apache.hadoop.hive.serde2.SerDe;
+import org.apache.hadoop.hive.serde2.Serializer;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector.Category;
 import org.apache.hadoop.hive.serde2.objectinspector.SettableStructObjectInspector;
@@ -557,7 +557,7 @@ public abstract class AbstractTestHiveFileFormats
             throws Exception
     {
         HiveOutputFormat<?, ?> outputFormat = newInstance(storageFormat.getOutputFormat(), HiveOutputFormat.class);
-        @SuppressWarnings("deprecation") SerDe serDe = newInstance(storageFormat.getSerDe(), SerDe.class);
+        Serializer serDe = newInstance(storageFormat.getSerDe(), Serializer.class);
 
         // filter out partition keys, which are not written to the file
         testColumns = ImmutableList.copyOf(filter(testColumns, not(TestColumn::isPartitionKey)));

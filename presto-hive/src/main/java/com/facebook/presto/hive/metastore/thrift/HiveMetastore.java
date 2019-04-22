@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.hive.metastore.thrift;
 
+import com.facebook.presto.hive.HivePartition;
 import com.facebook.presto.hive.PartitionStatistics;
 import com.facebook.presto.hive.metastore.HivePrivilegeInfo;
 import com.facebook.presto.spi.statistics.ColumnStatisticType;
@@ -124,5 +125,35 @@ public interface HiveMetastore
         // a table can only be owned by a user
         Optional<Table> table = getTable(databaseName, tableName);
         return table.isPresent() && user.equals(table.get().getOwner());
+    }
+
+    default long openTxn(String user)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default void commitTxn(long txnId)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default void rollbackTxn(long txnId)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default boolean sendTxnHeartBeatAndFindIfValid(long txn)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default void acquireSharedReadLock(String user, String queryId, long txn, Set<HivePartition> partitions)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default String getValidWriteIds(List<String> tableList, long currentTxn)
+    {
+        throw new UnsupportedOperationException();
     }
 }

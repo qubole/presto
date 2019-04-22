@@ -13,16 +13,20 @@
  */
 package com.facebook.presto.hive.metastore.thrift;
 
+import org.apache.hadoop.hive.metastore.api.AllocateTableWriteIdsRequest;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.HiveObjectPrivilege;
 import org.apache.hadoop.hive.metastore.api.HiveObjectRef;
+import org.apache.hadoop.hive.metastore.api.LockRequest;
+import org.apache.hadoop.hive.metastore.api.LockResponse;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.PrincipalPrivilegeSet;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.hadoop.hive.metastore.api.PrivilegeBag;
 import org.apache.hadoop.hive.metastore.api.Role;
 import org.apache.hadoop.hive.metastore.api.Table;
+import org.apache.hadoop.hive.metastore.api.TxnToWriteId;
 import org.apache.thrift.TException;
 
 import java.io.Closeable;
@@ -127,4 +131,52 @@ public interface HiveMetastoreClient
 
     void setUGI(String userName)
             throws TException;
+
+    default long openTxn(String user)
+            throws TException
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default void commitTxn(long txnId)
+            throws TException
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default void rollbackTxn(long txnId)
+            throws TException
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default boolean sendTxnHeartBeatAndFindIfValid(long txn)
+            throws TException
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default LockResponse acquireLock(LockRequest lockRequest)
+            throws TException
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default LockResponse checkLock(long lockId)
+            throws TException
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default String getValidWriteIds(List<String> tableList, long currentTxn)
+            throws TException
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default List<TxnToWriteId> allocateTableWriteIdsBatchIntr(AllocateTableWriteIdsRequest rqst)
+            throws TException
+    {
+        throw new UnsupportedOperationException();
+    }
 }

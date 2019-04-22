@@ -57,6 +57,7 @@ import org.apache.hadoop.hive.common.type.HiveVarchar;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.ProtectMode;
 import org.apache.hadoop.hive.ql.exec.FileSinkOperator.RecordWriter;
+import org.apache.hadoop.hive.ql.io.AcidUtils;
 import org.apache.hadoop.hive.ql.io.HiveOutputFormat;
 import org.apache.hadoop.hive.ql.io.RCFile;
 import org.apache.hadoop.hive.ql.io.RCFileOutputFormat;
@@ -470,6 +471,11 @@ public final class HiveWriteUtils
         // verify skew info
         if (storage.isSkewed()) {
             throw new PrestoException(NOT_SUPPORTED, format("Inserting into bucketed tables with skew is not supported. %s", tablePartitionDescription));
+        }
+
+        // verify table is not ACID table
+        if (AcidUtils.isTransactionalTable(parameters)) {
+            throw new PrestoException(NOT_SUPPORTED, format("Inserting into Hive Transcational tables is not supported: %s", tableName));
         }
     }
 

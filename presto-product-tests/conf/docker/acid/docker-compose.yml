@@ -1,0 +1,31 @@
+version: '2'
+
+services:
+  # Cannot put hadoop3 as a service in standard.yml and override depends_on in presto-master here to use hadoop3
+  # because depends_on list is append only, not overwritable
+  hadoop-master:
+    image: 'shubhamtagra/hdp3-hive3:1'
+    hostname: hadoop-master
+    ports:
+      - '${HIVE_PROXY_PORT}:1180'
+      - '5006:5006'
+      - '8020:8020'
+      - '8042:8042'
+      - '8088:8088'
+      - '9000:9000'
+      - '9083:9083'
+      - '10000:10000'
+      - '19888:19888'
+      - '50070:50070'
+      - '50075:50075'
+      - '9866:9866'
+      - '9867:9867'
+      - '9870:9870'
+      - '9864:9864'
+    volumes:
+      - ../..:/docker/volumes/conf
+      - ../../target:/docker/volumes/logs
+
+  application-runner:
+    environment:
+      - TEMPTO_PROFILE_CONFIG_FILE=/docker/volumes/conf/tempto/tempto-configuration-for-docker-acid.yaml

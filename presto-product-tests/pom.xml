@@ -32,19 +32,31 @@
             </exclusions>
         </dependency>
         <dependency>
-            <groupId>io.prestodb.tempto</groupId>
+            <groupId>com.qubole.tempto</groupId>
             <artifactId>tempto-core</artifactId>
         </dependency>
         <dependency>
-            <groupId>io.prestodb.tempto</groupId>
+            <groupId>com.qubole.tempto</groupId>
             <artifactId>tempto-ldap</artifactId>
         </dependency>
         <dependency>
-            <groupId>io.prestodb.tempto</groupId>
+            <groupId>com.qubole.tempto</groupId>
             <artifactId>tempto-kafka</artifactId>
+            <!-- Zookkeeper 3.10 dependency comes in with tempto-kafka, as a workaround exclude here and add 3.4.9 explicitly -->
+            <exclusions>
+                <exclusion>
+                    <groupId>org.apache.zookeeper</groupId>
+                    <artifactId>zookeeper</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
-            <groupId>io.prestodb.tempto</groupId>
+            <groupId>org.apache.zookeeper</groupId>
+            <artifactId>zookeeper</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.qubole.tempto</groupId>
             <artifactId>tempto-runner</artifactId>
         </dependency>
         <dependency>
@@ -109,6 +121,11 @@
             <scope>runtime</scope>
         </dependency>
         <dependency>
+            <groupId>com.qubole.presto.hive</groupId>
+            <artifactId>hive3-apache-jdbc</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
@@ -126,6 +143,57 @@
         <dependency>
             <groupId>com.facebook.presto.cassandra</groupId>
             <artifactId>cassandra-driver</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>io.dropwizard.metrics</groupId>
+                    <artifactId>metrics-core</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.netty</groupId>
+                    <artifactId>netty-buffer</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.netty</groupId>
+                    <artifactId>netty-codec</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.netty</groupId>
+                    <artifactId>netty-common</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.netty</groupId>
+                    <artifactId>netty-transport</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.netty</groupId>
+                    <artifactId>netty-handler</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <!-- For Hive acid tests -->
+        <dependency>
+            <groupId>com.facebook.presto</groupId>
+            <artifactId>presto-hive</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.apache.httpcomponents</groupId>
+                    <artifactId>httpcore</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.httpcomponents</groupId>
+                    <artifactId>httpclient</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.thrift</groupId>
+            <artifactId>libthrift</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.prestosql.hive</groupId>
+            <artifactId>hive-apache</artifactId>
+            <version>3.0.0-2</version>
         </dependency>
     </dependencies>
 
@@ -148,6 +216,13 @@
         </resources>
 
         <plugins>
+            <plugin>
+                <groupId>org.basepom.maven</groupId>
+                <artifactId>duplicate-finder-maven-plugin</artifactId>
+                <configuration>
+                    <skip>true</skip>
+                </configuration>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>

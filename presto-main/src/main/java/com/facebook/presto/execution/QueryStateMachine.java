@@ -712,7 +712,13 @@ public class QueryStateMachine
 
     private boolean transitionToFinished()
     {
-        cleanupQueryQuietly();
+        try {
+            cleanupQuery();
+        }
+        catch (Exception e) {
+            return transitionToFailed(e);
+        }
+
         recordDoneStats();
 
         return queryState.setIf(FINISHED, currentState -> !currentState.isDone());
@@ -757,6 +763,11 @@ public class QueryStateMachine
         }
 
         return canceled;
+    }
+
+    private void cleanupQuery()
+    {
+        metadata.cleanupQuery(session);
     }
 
     private void cleanupQueryQuietly()

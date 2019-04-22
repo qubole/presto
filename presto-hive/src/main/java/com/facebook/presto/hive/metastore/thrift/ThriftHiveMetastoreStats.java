@@ -43,6 +43,7 @@ public class ThriftHiveMetastoreStats
     private final HiveMetastoreApiStats listPrivileges = new HiveMetastoreApiStats();
     private final HiveMetastoreApiStats grantTablePrivileges = new HiveMetastoreApiStats();
     private final HiveMetastoreApiStats revokeTablePrivileges = new HiveMetastoreApiStats();
+    private final HiveMetastoreApiStats openTxn = new HiveMetastoreApiStats();
 
     @Managed
     @Nested
@@ -217,5 +218,12 @@ public class ThriftHiveMetastoreStats
     public HiveMetastoreApiStats getListPrivileges()
     {
         return listPrivileges;
+    }
+
+    @Managed
+    @Nested
+    public HiveMetastoreApiStats getOpenTxn()
+    {
+        return openTxn;
     }
 }

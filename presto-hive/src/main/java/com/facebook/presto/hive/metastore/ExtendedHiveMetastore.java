@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.hive.metastore;
 
+import com.facebook.presto.hive.HivePartition;
 import com.facebook.presto.hive.HiveType;
 import com.facebook.presto.hive.PartitionStatistics;
 import com.facebook.presto.spi.statistics.ColumnStatisticType;
@@ -103,4 +104,34 @@ public interface ExtendedHiveMetastore
     void grantTablePrivileges(String databaseName, String tableName, String grantee, Set<HivePrivilegeInfo> privileges);
 
     void revokeTablePrivileges(String databaseName, String tableName, String grantee, Set<HivePrivilegeInfo> privileges);
+
+    default long openTxn(String user)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default void commitTxn(long txnId)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default void rollbackTxn(long txnId)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default boolean sendTxnHeartBeatAndFindIfValid(long txn)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default void acquireSharedReadLock(String user, String queryId, long txn, Set<HivePartition> partitions)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default String getValidWriteIds(List<String> tableList, long currentTxn)
+    {
+        throw new UnsupportedOperationException();
+    }
 }
