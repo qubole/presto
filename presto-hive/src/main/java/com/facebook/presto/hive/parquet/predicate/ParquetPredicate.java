@@ -13,8 +13,8 @@
  */
 package com.facebook.presto.hive.parquet.predicate;
 
-import parquet.column.ColumnDescriptor;
-import parquet.column.statistics.Statistics;
+import org.apache.parquet.column.ColumnDescriptor;
+import org.apache.parquet.column.statistics.Statistics;
 
 import java.util.Map;
 

@@ -21,6 +21,7 @@ import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.type.Type;
 
 import java.io.IOException;
+import java.time.ZoneId;
 import java.util.List;
 
 import static com.facebook.presto.orc.metadata.ColumnEncoding.ColumnEncodingKind.DICTIONARY;
@@ -59,7 +60,7 @@ public class LongStreamReader
     }
 
     @Override
-    public void startStripe(InputStreamSources dictionaryStreamSources, List<ColumnEncoding> encoding)
+    public void startStripe(ZoneId timeZone, InputStreamSources dictionaryStreamSources, List<ColumnEncoding> encoding)
             throws IOException
     {
         ColumnEncodingKind kind = encoding.get(streamDescriptor.getStreamId()).getColumnEncodingKind();
@@ -73,7 +74,7 @@ public class LongStreamReader
             throw new IllegalArgumentException("Unsupported encoding " + kind);
         }
 
-        currentReader.startStripe(dictionaryStreamSources, encoding);
+        currentReader.startStripe(timeZone, dictionaryStreamSources, encoding);
     }
 
     @Override

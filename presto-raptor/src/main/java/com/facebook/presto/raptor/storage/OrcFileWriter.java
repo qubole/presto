@@ -31,11 +31,9 @@ import io.airlift.slice.Slice;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hive.ql.io.orc.NullMemoryManager;
 import org.apache.hadoop.hive.ql.io.orc.OrcFile;
 import org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat;
 import org.apache.hadoop.hive.ql.io.orc.OrcSerde;
-import org.apache.hadoop.hive.ql.io.orc.OrcWriterOptions;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector.Category;
 import org.apache.hadoop.hive.serde2.objectinspector.SettableStructObjectInspector;
@@ -44,6 +42,7 @@ import org.apache.hadoop.hive.serde2.typeinfo.ListTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.MapTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoUtils;
+import org.apache.orc.NullMemoryManager;
 
 import java.io.Closeable;
 import java.io.File;
@@ -201,8 +200,8 @@ public class OrcFileWriter
     {
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(FileSystem.class.getClassLoader());
                 FileSystem fileSystem = new SyncingFileSystem(CONFIGURATION)) {
-            OrcFile.WriterOptions options = new OrcWriterOptions(CONFIGURATION)
-                    .memory(new NullMemoryManager(CONFIGURATION))
+            OrcFile.WriterOptions options = OrcFile.writerOptions(CONFIGURATION)
+                    .memory(new NullMemoryManager())
                     .fileSystem(fileSystem)
                     .compress(SNAPPY);
 

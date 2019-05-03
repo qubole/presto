@@ -23,13 +23,13 @@ import com.facebook.presto.orc.stream.LongInputStream;
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.block.BlockBuilder;
 import com.facebook.presto.spi.type.Type;
-import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 import java.io.IOException;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.List;
 
 import static com.facebook.presto.orc.OrcReader.MAX_BATCH_SIZE;
@@ -47,7 +47,8 @@ public class TimestampStreamReader
     private static final int MILLIS_PER_SECOND = 1000;
 
     private final StreamDescriptor streamDescriptor;
-    private final long baseTimestampInSeconds;
+
+    private long baseTimestampInSeconds;
 
     private int readOffset;
     private int nextBatchSize;
@@ -73,10 +74,9 @@ public class TimestampStreamReader
 
     private boolean rowGroupOpen;
 
-    public TimestampStreamReader(StreamDescriptor streamDescriptor, DateTimeZone hiveStorageTimeZone)
+    public TimestampStreamReader(StreamDescriptor streamDescriptor)
     {
         this.streamDescriptor = requireNonNull(streamDescriptor, "stream is null");
-        this.baseTimestampInSeconds = new DateTime(2015, 1, 1, 0, 0, requireNonNull(hiveStorageTimeZone, "hiveStorageTimeZone is null")).getMillis() / MILLIS_PER_SECOND;
     }
 
     @Override
@@ -194,8 +194,10 @@ public class TimestampStreamReader
     }
 
     @Override
-    public void startStripe(InputStreamSources dictionaryStreamSources, List<ColumnEncoding> encoding)
+    public void startStripe(ZoneId timeZone, InputStreamSources dictionaryStreamSources, List<ColumnEncoding> encoding)
     {
+        baseTimestampInSeconds = ZonedDateTime.of(2015, 1, 1, 0, 0, 0, 0, timeZone).toEpochSecond();
+
         presentStreamSource = missingStreamSource(BooleanInputStream.class);
         secondsStreamSource = missingStreamSource(LongInputStream.class);
         nanosStreamSource = missingStreamSource(LongInputStream.class);

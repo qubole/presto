@@ -14,13 +14,13 @@
 package com.facebook.presto.hive.parquet.dictionary;
 
 import com.facebook.presto.hive.parquet.ParquetDictionaryPage;
-import parquet.io.api.Binary;
+import org.apache.parquet.io.api.Binary;
 
 import java.io.IOException;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
-import static parquet.bytes.BytesUtils.readIntLittleEndian;
+import static org.apache.parquet.bytes.BytesUtils.readIntLittleEndian;
 
 public class ParquetBinaryDictionary
         extends ParquetDictionary

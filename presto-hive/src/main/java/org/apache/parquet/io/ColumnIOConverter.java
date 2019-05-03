@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package parquet.io;
+package org.apache.parquet.io;
 
 import com.facebook.presto.hive.parquet.Field;
 import com.facebook.presto.hive.parquet.GroupField;
@@ -33,7 +33,9 @@ import static com.facebook.presto.hive.parquet.ParquetTypeUtils.lookupColumnByNa
 import static com.facebook.presto.spi.type.StandardTypes.ARRAY;
 import static com.facebook.presto.spi.type.StandardTypes.MAP;
 import static com.facebook.presto.spi.type.StandardTypes.ROW;
-import static parquet.schema.Type.Repetition.OPTIONAL;
+import static org.apache.parquet.io.ColumnIOUtil.columnDefinitionLevel;
+import static org.apache.parquet.io.ColumnIOUtil.columnRepetitionLevel;
+import static org.apache.parquet.schema.Type.Repetition.OPTIONAL;
 
 /**
  * Placed in parquet.io package to have access to ColumnIO getRepetitionLevel() and getDefinitionLevel() methods.
@@ -50,8 +52,8 @@ public class ColumnIOConverter
             return Optional.empty();
         }
         boolean required = columnIO.getType().getRepetition() != OPTIONAL;
-        int repetitionLevel = columnIO.getRepetitionLevel();
-        int definitionLevel = columnIO.getDefinitionLevel();
+        int repetitionLevel = columnRepetitionLevel(columnIO);
+        int definitionLevel = columnDefinitionLevel(columnIO);
         if (ROW.equals(type.getTypeSignature().getBase())) {
             GroupColumnIO groupColumnIO = (GroupColumnIO) columnIO;
             List<Type> parameters = type.getTypeParameters();

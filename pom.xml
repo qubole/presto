@@ -51,7 +51,7 @@
         <dep.okhttp.version>3.9.0</dep.okhttp.version>
         <dep.jdbi3.version>3.0.0</dep.jdbi3.version>
         <dep.drift.version>1.12</dep.drift.version>
-        <dep.tempto.version>1.49</dep.tempto.version>
+        <dep.tempto.version>1.49-qubole</dep.tempto.version>
         <dep.testng.version>6.10</dep.testng.version>
         <dep.assertj-core.version>3.8.0</dep.assertj-core.version>
 
@@ -370,9 +370,9 @@
             </dependency>
 
             <dependency>
-                <groupId>com.facebook.presto.hive</groupId>
+                <groupId>io.prestosql.hive</groupId>
                 <artifactId>hive-apache</artifactId>
-                <version>1.2.0-2</version>
+                <version>3.0.0-2</version>
             </dependency>
 
             <dependency>
@@ -772,7 +772,7 @@
             <dependency>
                 <groupId>org.apache.thrift</groupId>
                 <artifactId>libthrift</artifactId>
-                <version>0.9.1</version>
+                <version>0.9.3</version>
                 <exclusions>
                     <exclusion>
                         <groupId>org.apache.commons</groupId>

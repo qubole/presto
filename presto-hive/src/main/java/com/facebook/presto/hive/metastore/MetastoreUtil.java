@@ -18,6 +18,7 @@ import com.facebook.presto.hive.TableOfflineException;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.TableNotFoundException;
+import com.google.common.base.Joiner;
 import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.hadoop.hive.metastore.ProtectMode;
 
@@ -31,7 +32,7 @@ import static com.facebook.presto.spi.StandardErrorCode.NOT_SUPPORTED;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static java.util.stream.Collectors.toList;
-import static org.apache.hadoop.hive.metastore.MetaStoreUtils.typeToThriftType;
+import static org.apache.hadoop.hive.metastore.ColumnType.typeToThriftType;
 import static org.apache.hadoop.hive.metastore.ProtectMode.getProtectModeFromString;
 import static org.apache.hadoop.hive.metastore.api.hive_metastoreConstants.BUCKET_COUNT;
 import static org.apache.hadoop.hive.metastore.api.hive_metastoreConstants.BUCKET_FIELD_NAME;
@@ -99,7 +100,7 @@ public class MetastoreUtil
         schema.setProperty(META_TABLE_LOCATION, sd.getLocation());
 
         if (sd.getBucketProperty().isPresent()) {
-            schema.setProperty(BUCKET_FIELD_NAME, sd.getBucketProperty().get().getBucketedBy().get(0));
+            schema.setProperty(BUCKET_FIELD_NAME, Joiner.on(",").join(sd.getBucketProperty().get().getBucketedBy()));
             schema.setProperty(BUCKET_COUNT, Integer.toString(sd.getBucketProperty().get().getBucketCount()));
         }
         else {

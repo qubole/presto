@@ -16,7 +16,7 @@ package com.facebook.presto.hive.parquet.reader;
 import com.facebook.presto.hive.parquet.RichColumnDescriptor;
 import com.facebook.presto.spi.block.BlockBuilder;
 import com.facebook.presto.spi.type.Type;
-import parquet.io.api.Binary;
+import org.apache.parquet.io.api.Binary;
 
 import static com.facebook.presto.hive.parquet.ParquetTimestampUtils.getTimestampMillis;
 

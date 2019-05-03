@@ -14,9 +14,12 @@
 package com.facebook.presto.hive.parquet.dictionary;
 
 import com.facebook.presto.hive.parquet.ParquetDictionaryPage;
-import parquet.column.values.plain.PlainValuesReader.FloatPlainValuesReader;
+import com.google.common.collect.ImmutableList;
+import org.apache.parquet.bytes.ByteBufferInputStream;
+import org.apache.parquet.column.values.plain.PlainValuesReader.FloatPlainValuesReader;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 
@@ -31,7 +34,9 @@ public class ParquetFloatDictionary
         super(dictionaryPage.getEncoding());
         content = new float[dictionaryPage.getDictionarySize()];
         FloatPlainValuesReader floatReader = new FloatPlainValuesReader();
-        floatReader.initFromPage(dictionaryPage.getDictionarySize(), dictionaryPage.getSlice().getBytes(), 0);
+        ByteBuffer byteBuffer = ByteBuffer.wrap(dictionaryPage.getSlice().getBytes());
+        ByteBufferInputStream inputStream = ByteBufferInputStream.wrap(ImmutableList.of(byteBuffer));
+        floatReader.initFromPage(dictionaryPage.getDictionarySize(), inputStream);
         for (int i = 0; i < content.length; i++) {
             content[i] = floatReader.readFloat();
         }

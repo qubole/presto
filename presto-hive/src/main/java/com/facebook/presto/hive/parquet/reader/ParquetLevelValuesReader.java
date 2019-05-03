@@ -13,7 +13,7 @@
  */
 package com.facebook.presto.hive.parquet.reader;
 
-import parquet.column.values.ValuesReader;
+import org.apache.parquet.column.values.ValuesReader;
 
 public class ParquetLevelValuesReader
         implements ParquetLevelReader

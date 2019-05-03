@@ -22,12 +22,12 @@ import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.block.RowBlock;
 import com.facebook.presto.spi.block.RunLengthEncodedBlock;
 import com.facebook.presto.spi.type.Type;
-import org.joda.time.DateTimeZone;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 import java.io.IOException;
+import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.List;
 
@@ -55,7 +55,7 @@ public class StructStreamReader
 
     private boolean rowGroupOpen;
 
-    public StructStreamReader(StreamDescriptor streamDescriptor, DateTimeZone hiveStorageTimeZone)
+    public StructStreamReader(StreamDescriptor streamDescriptor)
     {
         this.streamDescriptor = requireNonNull(streamDescriptor, "stream is null");
 
@@ -63,7 +63,7 @@ public class StructStreamReader
         this.structFields = new StreamReader[nestedStreams.size()];
         for (int i = 0; i < nestedStreams.size(); i++) {
             StreamDescriptor nestedStream = nestedStreams.get(i);
-            this.structFields[i] = createStreamReader(nestedStream, hiveStorageTimeZone);
+            this.structFields[i] = createStreamReader(nestedStream);
         }
     }
 
@@ -153,7 +153,7 @@ public class StructStreamReader
     }
 
     @Override
-    public void startStripe(InputStreamSources dictionaryStreamSources, List<ColumnEncoding> encoding)
+    public void startStripe(ZoneId timeZone, InputStreamSources dictionaryStreamSources, List<ColumnEncoding> encoding)
             throws IOException
     {
         presentStreamSource = missingStreamSource(BooleanInputStream.class);
@@ -166,7 +166,7 @@ public class StructStreamReader
         rowGroupOpen = false;
 
         for (StreamReader structField : structFields) {
-            structField.startStripe(dictionaryStreamSources, encoding);
+            structField.startStripe(timeZone, dictionaryStreamSources, encoding);
         }
     }
 

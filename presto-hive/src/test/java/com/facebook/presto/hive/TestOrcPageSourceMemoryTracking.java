@@ -51,15 +51,13 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.ql.exec.FileSinkOperator.RecordWriter;
 import org.apache.hadoop.hive.ql.io.HiveOutputFormat;
-import org.apache.hadoop.hive.ql.io.orc.NullMemoryManager;
+import org.apache.hadoop.hive.ql.io.orc.OrcFile;
 import org.apache.hadoop.hive.ql.io.orc.OrcFile.WriterOptions;
 import org.apache.hadoop.hive.ql.io.orc.OrcInputFormat;
 import org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat;
 import org.apache.hadoop.hive.ql.io.orc.OrcSerde;
-import org.apache.hadoop.hive.ql.io.orc.OrcWriterOptions;
 import org.apache.hadoop.hive.ql.io.orc.Writer;
-import org.apache.hadoop.hive.ql.io.orc.WriterImpl;
-import org.apache.hadoop.hive.serde2.SerDe;
+import org.apache.hadoop.hive.serde2.Serializer;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.SettableStructObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.StructField;
@@ -69,6 +67,7 @@ import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.io.compress.CompressionCodecFactory;
 import org.apache.hadoop.mapred.FileSplit;
 import org.apache.hadoop.mapred.JobConf;
+import org.apache.orc.NullMemoryManager;
 import org.joda.time.DateTimeZone;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -536,7 +535,7 @@ public class TestOrcPageSourceMemoryTracking
 
     public static FileSplit createTestFile(String filePath,
             HiveOutputFormat<?, ?> outputFormat,
-            @SuppressWarnings("deprecation") SerDe serDe,
+            Serializer serDe,
             String compressionCodec,
             List<TestColumn> testColumns,
             int numRows,
@@ -603,7 +602,7 @@ public class TestOrcPageSourceMemoryTracking
                     .getDeclaredField("writer");
             writerField.setAccessible(true);
             Writer writer = (Writer) writerField.get(recordWriter);
-            Method flushStripe = WriterImpl.class.getDeclaredMethod("flushStripe");
+            Method flushStripe = org.apache.orc.impl.WriterImpl.class.getDeclaredMethod("flushStripe");
             flushStripe.setAccessible(true);
             flushStripe.invoke(writer);
         }
@@ -615,8 +614,8 @@ public class TestOrcPageSourceMemoryTracking
     private static RecordWriter createRecordWriter(Path target, Configuration conf)
     {
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(FileSystem.class.getClassLoader())) {
-            WriterOptions options = new OrcWriterOptions(conf)
-                    .memory(new NullMemoryManager(conf))
+            WriterOptions options = OrcFile.writerOptions(conf)
+                    .memory(new NullMemoryManager())
                     .compress(ZLIB);
 
             try {

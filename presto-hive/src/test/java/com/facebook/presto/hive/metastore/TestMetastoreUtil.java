@@ -17,17 +17,18 @@ import com.facebook.presto.hive.metastore.thrift.ThriftMetastoreUtil;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMultimap;
-import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Order;
 import org.apache.hadoop.hive.metastore.api.PrincipalPrivilegeSet;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.SkewedInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
+import org.apache.hadoop.hive.metastore.utils.MetaStoreUtils;
 import org.testng.annotations.Test;
 
 import java.util.Properties;
 
+import static org.apache.hadoop.hive.serde.serdeConstants.COLUMN_NAME_DELIMITER;
 import static org.testng.Assert.assertEquals;
 
 public class TestMetastoreUtil
@@ -140,6 +141,7 @@ public class TestMetastoreUtil
     public void testHiveSchemaTable()
     {
         Properties expected = MetaStoreUtils.getTableMetadata(TEST_TABLE_WITH_UNSUPPORTED_FIELDS);
+        expected.remove(COLUMN_NAME_DELIMITER);
         Properties actual = MetastoreUtil.getHiveSchema(ThriftMetastoreUtil.fromMetastoreApiTable(TEST_TABLE_WITH_UNSUPPORTED_FIELDS));
         assertEquals(actual, expected);
     }
@@ -148,6 +150,7 @@ public class TestMetastoreUtil
     public void testHiveSchemaPartition()
     {
         Properties expected = MetaStoreUtils.getPartitionMetadata(TEST_PARTITION_WITH_UNSUPPORTED_FIELDS, TEST_TABLE_WITH_UNSUPPORTED_FIELDS);
+        expected.remove(COLUMN_NAME_DELIMITER);
         Properties actual = MetastoreUtil.getHiveSchema(ThriftMetastoreUtil.fromMetastoreApiPartition(TEST_PARTITION_WITH_UNSUPPORTED_FIELDS), ThriftMetastoreUtil.fromMetastoreApiTable(TEST_TABLE_WITH_UNSUPPORTED_FIELDS));
         assertEquals(actual, expected);
     }

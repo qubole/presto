@@ -17,6 +17,7 @@ import com.facebook.presto.orc.metadata.ColumnEncoding;
 import com.facebook.presto.orc.stream.InputStreamSources;
 import com.google.common.collect.ImmutableList;
 
+import java.time.ZoneId;
 import java.util.List;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
@@ -25,16 +26,23 @@ import static java.util.Objects.requireNonNull;
 public class Stripe
 {
     private final long rowCount;
+    private final ZoneId timeZone;
     private final List<ColumnEncoding> columnEncodings;
     private final List<RowGroup> rowGroups;
     private final InputStreamSources dictionaryStreamSources;
 
-    public Stripe(long rowCount, List<ColumnEncoding> columnEncodings, List<RowGroup> rowGroups, InputStreamSources dictionaryStreamSources)
+    public Stripe(long rowCount, ZoneId timeZone, List<ColumnEncoding> columnEncodings, List<RowGroup> rowGroups, InputStreamSources dictionaryStreamSources)
     {
         this.rowCount = rowCount;
+        this.timeZone = requireNonNull(timeZone, "timeZone is null");
         this.columnEncodings = requireNonNull(columnEncodings, "columnEncodings is null");
         this.rowGroups = ImmutableList.copyOf(requireNonNull(rowGroups, "rowGroups is null"));
         this.dictionaryStreamSources = requireNonNull(dictionaryStreamSources, "dictionaryStreamSources is null");
+    }
+
+    public ZoneId getTimeZone()
+    {
+        return timeZone;
     }
 
     public long getRowCount()
@@ -62,6 +70,7 @@ public class Stripe
     {
         return toStringHelper(this)
                 .add("rowCount", rowCount)
+                .add("timeZone", timeZone)
                 .add("columnEncodings", columnEncodings)
                 .add("rowGroups", rowGroups)
                 .add("dictionaryStreams", dictionaryStreamSources)

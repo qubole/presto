@@ -17,7 +17,7 @@ import com.facebook.presto.hive.parquet.ParquetDataPage;
 import com.facebook.presto.hive.parquet.ParquetDataPageV1;
 import com.facebook.presto.hive.parquet.ParquetDataPageV2;
 import com.facebook.presto.hive.parquet.ParquetDictionaryPage;
-import parquet.hadoop.metadata.CompressionCodecName;
+import org.apache.parquet.hadoop.metadata.CompressionCodecName;
 
 import java.io.IOException;
 import java.util.LinkedList;

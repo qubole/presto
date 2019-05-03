@@ -2789,7 +2789,9 @@ public class TestHiveIntegrationSmokeTest
         Session session = getSession();
         ImmutableList.Builder<TestingHiveStorageFormat> formats = ImmutableList.builder();
         for (HiveStorageFormat hiveStorageFormat : HiveStorageFormat.values()) {
-            formats.add(new TestingHiveStorageFormat(session, hiveStorageFormat));
+            if (hiveStorageFormat != HiveStorageFormat.DWRF) {
+                formats.add(new TestingHiveStorageFormat(session, hiveStorageFormat));
+            }
         }
         formats.add(new TestingHiveStorageFormat(
                 Session.builder(session).setCatalogSessionProperty(session.getCatalog().get(), "orc_optimized_writer_enabled", "true").build(),

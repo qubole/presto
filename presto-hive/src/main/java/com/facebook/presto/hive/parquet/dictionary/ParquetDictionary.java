@@ -14,7 +14,7 @@
 package com.facebook.presto.hive.parquet.dictionary;
 
 import com.facebook.presto.hive.parquet.ParquetEncoding;
-import parquet.io.api.Binary;
+import org.apache.parquet.io.api.Binary;
 
 import static com.google.common.base.Preconditions.checkArgument;
 

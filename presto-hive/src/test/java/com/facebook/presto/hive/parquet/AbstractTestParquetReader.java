@@ -31,12 +31,12 @@ import org.apache.hadoop.hive.common.type.HiveDecimal;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.JavaHiveDecimalObjectInspector;
 import org.apache.hadoop.hive.serde2.typeinfo.DecimalTypeInfo;
+import org.apache.parquet.hadoop.ParquetOutputFormat;
+import org.apache.parquet.hadoop.codec.CodecConfig;
+import org.apache.parquet.schema.MessageType;
 import org.joda.time.DateTimeZone;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-import parquet.hadoop.ParquetOutputFormat;
-import parquet.hadoop.codec.CodecConfig;
-import parquet.schema.MessageType;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -101,8 +101,8 @@ import static org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveO
 import static org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory.javaShortObjectInspector;
 import static org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory.javaStringObjectInspector;
 import static org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory.javaTimestampObjectInspector;
+import static org.apache.parquet.schema.MessageTypeParser.parseMessageType;
 import static org.testng.Assert.assertEquals;
-import static parquet.schema.MessageTypeParser.parseMessageType;
 
 public abstract class AbstractTestParquetReader
 {
@@ -1701,6 +1701,7 @@ public abstract class AbstractTestParquetReader
             return null;
         }
         Timestamp timestamp = new Timestamp(0);
+
         long seconds = (input / 1000);
         int nanos = ((input % 1000) * 1_000_000);
 
@@ -1715,6 +1716,7 @@ public abstract class AbstractTestParquetReader
             nanos -= 1_000_000_000;
             seconds += 1;
         }
+
         timestamp.setTime(seconds * 1000);
         timestamp.setNanos(nanos);
         return timestamp;

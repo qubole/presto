@@ -44,6 +44,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.TimeZone;
 
 import static com.facebook.presto.orc.metadata.CompressionKind.LZ4;
 import static com.facebook.presto.orc.metadata.CompressionKind.NONE;
@@ -61,6 +62,7 @@ import static com.facebook.presto.orc.metadata.statistics.IntegerStatistics.INTE
 import static com.facebook.presto.orc.metadata.statistics.ShortDecimalStatisticsBuilder.SHORT_DECIMAL_VALUE_BYTES;
 import static com.facebook.presto.orc.metadata.statistics.StringStatistics.STRING_VALUE_BYTES_OVERHEAD;
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.base.Strings.emptyToNull;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.airlift.slice.SliceUtf8.lengthOfCodePoint;
 import static io.airlift.slice.SliceUtf8.tryGetCodePointAt;
@@ -159,7 +161,11 @@ public class OrcMetadataReader
     {
         CodedInputStream input = CodedInputStream.newInstance(inputStream);
         OrcProto.StripeFooter stripeFooter = OrcProto.StripeFooter.parseFrom(input);
-        return new StripeFooter(toStream(stripeFooter.getStreamsList()), toColumnEncoding(stripeFooter.getColumnsList()));
+        return new StripeFooter(
+                toStream(stripeFooter.getStreamsList()),
+                toColumnEncoding(stripeFooter.getColumnsList()),
+                Optional.ofNullable(emptyToNull(stripeFooter.getWriterTimezone()))
+                        .map(zone -> TimeZone.getTimeZone(zone).toZoneId()));
     }
 
     private static Stream toStream(OrcProto.Stream stream)

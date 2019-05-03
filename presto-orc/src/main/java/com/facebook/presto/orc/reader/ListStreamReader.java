@@ -23,12 +23,12 @@ import com.facebook.presto.orc.stream.LongInputStream;
 import com.facebook.presto.spi.block.ArrayBlock;
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.type.Type;
-import org.joda.time.DateTimeZone;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 import java.io.IOException;
+import java.time.ZoneId;
 import java.util.List;
 
 import static com.facebook.presto.orc.metadata.Stream.StreamKind.LENGTH;
@@ -61,10 +61,10 @@ public class ListStreamReader
 
     private boolean rowGroupOpen;
 
-    public ListStreamReader(StreamDescriptor streamDescriptor, DateTimeZone hiveStorageTimeZone)
+    public ListStreamReader(StreamDescriptor streamDescriptor)
     {
         this.streamDescriptor = requireNonNull(streamDescriptor, "stream is null");
-        this.elementStreamReader = createStreamReader(streamDescriptor.getNestedStreams().get(0), hiveStorageTimeZone);
+        this.elementStreamReader = createStreamReader(streamDescriptor.getNestedStreams().get(0));
     }
 
     @Override
@@ -155,7 +155,7 @@ public class ListStreamReader
     }
 
     @Override
-    public void startStripe(InputStreamSources dictionaryStreamSources, List<ColumnEncoding> encoding)
+    public void startStripe(ZoneId timeZone, InputStreamSources dictionaryStreamSources, List<ColumnEncoding> encoding)
             throws IOException
     {
         presentStreamSource = missingStreamSource(BooleanInputStream.class);
@@ -169,7 +169,7 @@ public class ListStreamReader
 
         rowGroupOpen = false;
 
-        elementStreamReader.startStripe(dictionaryStreamSources, encoding);
+        elementStreamReader.startStripe(timeZone, dictionaryStreamSources, encoding);
     }
 
     @Override

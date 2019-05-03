@@ -34,7 +34,6 @@ import com.facebook.presto.hive.metastore.thrift.HiveCluster;
 import com.facebook.presto.hive.metastore.thrift.TestingHiveCluster;
 import com.facebook.presto.hive.metastore.thrift.ThriftHiveMetastore;
 import com.facebook.presto.hive.orc.OrcPageSource;
-import com.facebook.presto.hive.parquet.ParquetHiveRecordCursor;
 import com.facebook.presto.hive.parquet.ParquetPageSource;
 import com.facebook.presto.hive.rcfile.RcFilePageSource;
 import com.facebook.presto.metadata.MetadataManager;
@@ -4058,10 +4057,6 @@ public abstract class AbstractTestHiveClient
 
     private static Class<? extends RecordCursor> recordCursorType(HiveStorageFormat hiveStorageFormat)
     {
-        switch (hiveStorageFormat) {
-            case PARQUET:
-                return ParquetHiveRecordCursor.class;
-        }
         return GenericHiveRecordCursor.class;
     }
 
