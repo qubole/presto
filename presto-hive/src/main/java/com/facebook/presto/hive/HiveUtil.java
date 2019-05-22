@@ -42,6 +42,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.JavaUtils;
 import org.apache.hadoop.hive.ql.exec.Utilities;
+import org.apache.hadoop.hive.ql.io.AcidUtils;
 import org.apache.hadoop.hive.ql.io.SymlinkTextInputFormat;
 import org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat;
 import org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe;
@@ -86,6 +87,7 @@ import java.util.regex.Pattern;
 
 import static com.facebook.presto.hive.HiveColumnHandle.ColumnType.PARTITION_KEY;
 import static com.facebook.presto.hive.HiveColumnHandle.ColumnType.REGULAR;
+import static com.facebook.presto.hive.HiveColumnHandle.acidRowValidityColumnHandle;
 import static com.facebook.presto.hive.HiveColumnHandle.bucketColumnHandle;
 import static com.facebook.presto.hive.HiveColumnHandle.isBucketColumnHandle;
 import static com.facebook.presto.hive.HiveColumnHandle.isPathColumnHandle;
@@ -774,6 +776,11 @@ public final class HiveUtil
         columns.add(pathColumnHandle());
         if (table.getStorage().getBucketProperty().isPresent()) {
             columns.add(bucketColumnHandle());
+        }
+
+        // add isValid column for ACID tables at the end
+        if (AcidUtils.isFullAcidTable(table.getParameters())) {
+            columns.add(acidRowValidityColumnHandle());
         }
 
         return columns.build();

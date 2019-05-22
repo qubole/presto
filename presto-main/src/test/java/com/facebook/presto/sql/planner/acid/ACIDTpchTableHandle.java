@@ -11,17 +11,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.facebook.presto.spi;
+package com.facebook.presto.sql.planner.acid;
 
-public interface ConnectorTableHandle
+import com.facebook.presto.tpch.TpchTableHandle;
+
+public class ACIDTpchTableHandle
+        extends TpchTableHandle
 {
-    /*
-     * This is a workaround, until the change to let connectors take part in Optimizers lands
-     * Right now, Hive Full ACID tables will return true for this call
-     * And during AST to RelationPlan conversion, a FilterNode will be added for ACID TableScanNode
-     */
-    default boolean isFullAcidTable()
+    public ACIDTpchTableHandle(String connectorId, String tableName, double scaleFactor)
     {
-        return false;
+        super(connectorId, tableName, scaleFactor);
+    }
+
+    @Override
+    public boolean isFullAcidTable()
+    {
+        return true;
     }
 }

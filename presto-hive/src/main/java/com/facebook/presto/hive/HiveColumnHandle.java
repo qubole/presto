@@ -23,8 +23,10 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Objects;
 import java.util.Optional;
 
+import static com.facebook.presto.hive.HiveColumnHandle.ColumnType.ACID_ROW_VALIDITY;
 import static com.facebook.presto.hive.HiveColumnHandle.ColumnType.PARTITION_KEY;
 import static com.facebook.presto.hive.HiveColumnHandle.ColumnType.SYNTHESIZED;
+import static com.facebook.presto.hive.HiveType.HIVE_BOOLEAN;
 import static com.facebook.presto.hive.HiveType.HIVE_INT;
 import static com.facebook.presto.hive.HiveType.HIVE_LONG;
 import static com.facebook.presto.hive.HiveType.HIVE_STRING;
@@ -46,6 +48,11 @@ public class HiveColumnHandle
     public static final HiveType BUCKET_HIVE_TYPE = HIVE_INT;
     public static final TypeSignature BUCKET_TYPE_SIGNATURE = BUCKET_HIVE_TYPE.getTypeSignature();
 
+    public static final int IS_VALID_ACID_ROW = -99;
+    public static final String IS_VALID_ACID_ROW_NAME = "$isValid";
+    public static final HiveType IS_VALID_ACID_ROW_TYPE = HIVE_BOOLEAN;
+    public static final TypeSignature IS_VALID_ACID_ROW_TYPE_SIGNATURE = IS_VALID_ACID_ROW_TYPE.getTypeSignature();
+
     private static final String UPDATE_ROW_ID_COLUMN_NAME = "$shard_row_id";
 
     public enum ColumnType
@@ -53,6 +60,7 @@ public class HiveColumnHandle
         PARTITION_KEY,
         REGULAR,
         SYNTHESIZED,
+        ACID_ROW_VALIDITY,
     }
 
     private final String name;
@@ -72,7 +80,7 @@ public class HiveColumnHandle
             @JsonProperty("comment") Optional<String> comment)
     {
         this.name = requireNonNull(name, "name is null");
-        checkArgument(hiveColumnIndex >= 0 || columnType == PARTITION_KEY || columnType == SYNTHESIZED, "hiveColumnIndex is negative");
+        checkArgument(hiveColumnIndex >= 0 || columnType == PARTITION_KEY || columnType == SYNTHESIZED || columnType == ACID_ROW_VALIDITY, "hiveColumnIndex is negative");
         this.hiveColumnIndex = hiveColumnIndex;
         this.hiveType = requireNonNull(hiveType, "hiveType is null");
         this.typeName = requireNonNull(typeSignature, "type is null");
@@ -105,7 +113,7 @@ public class HiveColumnHandle
 
     public boolean isHidden()
     {
-        return columnType == SYNTHESIZED;
+        return (columnType == SYNTHESIZED) || columnType == ACID_ROW_VALIDITY;
     }
 
     public ColumnMetadata getColumnMetadata(TypeManager typeManager)
@@ -181,6 +189,11 @@ public class HiveColumnHandle
     public static HiveColumnHandle pathColumnHandle()
     {
         return new HiveColumnHandle(PATH_COLUMN_NAME, PATH_HIVE_TYPE, PATH_TYPE_SIGNATURE, PATH_COLUMN_INDEX, SYNTHESIZED, Optional.empty());
+    }
+
+    public static HiveColumnHandle acidRowValidityColumnHandle()
+    {
+        return new HiveColumnHandle(IS_VALID_ACID_ROW_NAME, IS_VALID_ACID_ROW_TYPE, IS_VALID_ACID_ROW_TYPE_SIGNATURE, IS_VALID_ACID_ROW, ACID_ROW_VALIDITY, Optional.empty());
     }
 
     /**

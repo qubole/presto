@@ -366,12 +366,12 @@ public class BackgroundHiveSplitLoader
             fileIterators.addLast(createInternalHiveSplitIterator(path, fs, splitFactory, splittable));
         }
         else {
-            if (AcidUtils.isFullAcidTable(table.getParameters())) {
+            /*if (AcidUtils.isFullAcidTable(table.getParameters())) {
                 throw new PrestoException(NOT_SUPPORTED, format("Reading from Full ACID tables are not supported: %s.%s", table.getDatabaseName(), table.getTableName()));
-            }
+            }*/
 
             // Now we should only have insert only table
-            checkState(AcidUtils.isInsertOnlyTable(table.getParameters()), String.format("Unknown transactional table type [%s] : neither Insert Only nor Full ACID", table.getTableName()));
+            //checkState(AcidUtils.isInsertOnlyTable(table.getParameters()), String.format("Unknown transactional table type [%s] : neither Insert Only nor Full ACID", table.getTableName()));
             AcidUtils.Directory directory = AcidUtils.getAcidState(
                     path,
                     configuration,

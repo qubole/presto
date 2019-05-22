@@ -101,6 +101,7 @@ public class DwrfPageSourceFactory
                 getOrcMaxReadBlockSize(session),
                 getOrcLazyReadSmallRanges(session),
                 false,
-                stats));
+                stats,
+                false));
     }
 }

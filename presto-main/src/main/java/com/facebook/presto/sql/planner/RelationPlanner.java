@@ -44,6 +44,7 @@ import com.facebook.presto.sql.planner.plan.UnionNode;
 import com.facebook.presto.sql.planner.plan.UnnestNode;
 import com.facebook.presto.sql.planner.plan.ValuesNode;
 import com.facebook.presto.sql.tree.AliasedRelation;
+import com.facebook.presto.sql.tree.BooleanLiteral;
 import com.facebook.presto.sql.tree.Cast;
 import com.facebook.presto.sql.tree.CoalesceExpression;
 import com.facebook.presto.sql.tree.ComparisonExpression;
@@ -88,6 +89,7 @@ import java.util.Optional;
 import java.util.Set;
 
 import static com.facebook.presto.sql.analyzer.SemanticExceptions.notSupportedException;
+import static com.facebook.presto.sql.tree.ComparisonExpression.Operator.EQUAL;
 import static com.facebook.presto.sql.tree.Join.Type.INNER;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
@@ -159,6 +161,11 @@ class RelationPlanner
 
         List<Symbol> outputSymbols = outputSymbolsBuilder.build();
         PlanNode root = new TableScanNode(idAllocator.getNextId(), handle, outputSymbols, columns.build(), Optional.empty(), TupleDomain.all(), null);
+        if (handle.getConnectorHandle().isFullAcidTable()) {
+            // Last column will be isValid column
+            root = addFilterNodeForACIDTable((TableScanNode) root, outputSymbols.get(outputSymbols.size() - 1));
+            outputSymbols = root.getOutputSymbols();
+        }
         return new RelationPlan(root, scope, outputSymbols);
     }
 
@@ -851,5 +858,14 @@ class RelationPlanner
         {
             return symbolMapping;
         }
+    }
+
+    private PlanNode addFilterNodeForACIDTable(TableScanNode node, Symbol isValidSymbol)
+    {
+        ComparisonExpression filterExpression = new ComparisonExpression(EQUAL, isValidSymbol.toSymbolReference(), new BooleanLiteral("true"));
+        return new FilterNode(
+                idAllocator.getNextId(),
+                node,
+                filterExpression);
     }
 }

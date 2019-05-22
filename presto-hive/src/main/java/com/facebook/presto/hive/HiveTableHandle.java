@@ -27,14 +27,24 @@ public class HiveTableHandle
 {
     private final String schemaName;
     private final String tableName;
+    private boolean isFullAcid;
+
+    public HiveTableHandle(
+            String schemaName,
+            String tableName)
+    {
+        this(schemaName, tableName, false);
+    }
 
     @JsonCreator
     public HiveTableHandle(
             @JsonProperty("schemaName") String schemaName,
-            @JsonProperty("tableName") String tableName)
+            @JsonProperty("tableName") String tableName,
+            @JsonProperty("isFullAcid") boolean isFullAcid)
     {
         this.schemaName = requireNonNull(schemaName, "schemaName is null");
         this.tableName = requireNonNull(tableName, "tableName is null");
+        this.isFullAcid = isFullAcid;
     }
 
     @JsonProperty
@@ -47,6 +57,12 @@ public class HiveTableHandle
     public String getTableName()
     {
         return tableName;
+    }
+
+    @Override
+    public boolean isFullAcidTable()
+    {
+        return isFullAcid;
     }
 
     public SchemaTableName getSchemaTableName()

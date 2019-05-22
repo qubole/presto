@@ -11,17 +11,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.facebook.presto.spi;
+package com.facebook.presto.orc;
 
-public interface ConnectorTableHandle
+public class ACIDConstants
 {
-    /*
-     * This is a workaround, until the change to let connectors take part in Optimizers lands
-     * Right now, Hive Full ACID tables will return true for this call
-     * And during AST to RelationPlan conversion, a FilterNode will be added for ACID TableScanNode
-     */
-    default boolean isFullAcidTable()
+    public static final int ACID_META_COLS_COUNT = 5;
+    public static final int ACID_ROW_STRUCT_INDEX = 6;
+
+    private ACIDConstants()
     {
-        return false;
     }
 }

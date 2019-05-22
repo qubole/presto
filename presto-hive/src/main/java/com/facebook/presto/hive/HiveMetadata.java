@@ -85,6 +85,7 @@ import io.airlift.slice.Slice;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.ql.exec.FileSinkOperator;
+import org.apache.hadoop.hive.ql.io.AcidUtils;
 import org.apache.hadoop.mapred.JobConf;
 import org.joda.time.DateTimeZone;
 
@@ -111,6 +112,7 @@ import static com.facebook.presto.hive.HiveColumnHandle.BUCKET_COLUMN_NAME;
 import static com.facebook.presto.hive.HiveColumnHandle.ColumnType.PARTITION_KEY;
 import static com.facebook.presto.hive.HiveColumnHandle.ColumnType.REGULAR;
 import static com.facebook.presto.hive.HiveColumnHandle.ColumnType.SYNTHESIZED;
+import static com.facebook.presto.hive.HiveColumnHandle.IS_VALID_ACID_ROW_NAME;
 import static com.facebook.presto.hive.HiveColumnHandle.PATH_COLUMN_NAME;
 import static com.facebook.presto.hive.HiveColumnHandle.updateRowIdHandle;
 import static com.facebook.presto.hive.HiveErrorCode.HIVE_COLUMN_ORDER_MISMATCH;
@@ -285,6 +287,9 @@ public class HiveMetadata
         }
 
         verifyOnline(tableName, Optional.empty(), getProtectMode(table.get()), table.get().getParameters());
+        if (AcidUtils.isFullAcidTable(table.get().getParameters())) {
+            return new HiveTableHandle(tableName.getSchemaName(), tableName.getTableName(), true);
+        }
         return new HiveTableHandle(tableName.getSchemaName(), tableName.getTableName());
     }
 
@@ -1764,6 +1769,9 @@ public class HiveMetadata
         builder.put(PATH_COLUMN_NAME, Optional.empty());
         if (table.getStorage().getBucketProperty().isPresent()) {
             builder.put(BUCKET_COLUMN_NAME, Optional.empty());
+        }
+        if (AcidUtils.isFullAcidTable(table.getParameters())) {
+            builder.put(IS_VALID_ACID_ROW_NAME, Optional.empty());
         }
 
         Map<String, Optional<String>> columnComment = builder.build();

@@ -28,6 +28,7 @@ import com.facebook.presto.spi.block.LazyBlock;
 import com.facebook.presto.spi.block.LazyBlockLoader;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spi.type.TypeManager;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 
 import java.io.IOException;
@@ -247,5 +248,11 @@ public class OrcPageSource
 
             loaded = true;
         }
+    }
+
+    @VisibleForTesting
+    public OrcRecordReader getRecordReader()
+    {
+        return recordReader;
     }
 }

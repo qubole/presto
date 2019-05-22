@@ -240,11 +240,7 @@ public class SemiTransactionalHiveMetastore
         Optional<Table> table = getTable(handle.getSchemaName(), handle.getTableName());
         checkArgument(table.isPresent(), "Table not found: " + handle.getSchemaTableName());
 
-        if (AcidUtils.isFullAcidTable(table.get().getParameters())) {
-            // new exception
-            throw new PrestoException(NOT_SUPPORTED, format("Reading from Full ACID tables are not supported: %s.%s", table.get().getDatabaseName(), table.get().getTableName()));
-        }
-        if (AcidUtils.isInsertOnlyTable(table.get().getParameters())) {
+        if (AcidUtils.isTransactionalTable(table.get().getParameters())) {
             transactionalPartitionsRead.addAll(partitions);
         }
     }
