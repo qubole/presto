@@ -44,7 +44,7 @@ public class TestSimpleACIDFileRead
     @BeforeTest
     public void setup()
     {
-        pageSource = AcidPageProcessorProvider.getAcidPageSource(filename, columnNames, columnTypes);
+        pageSource = AcidPageProcessorProvider.getActualPageSourceForAcidFile(filename, columnNames, columnTypes);
     }
 
     @Test

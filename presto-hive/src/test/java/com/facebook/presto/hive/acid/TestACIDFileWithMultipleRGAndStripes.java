@@ -44,6 +44,8 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 /*
+ * This class tests reading of ACID ORC File as is i.e. reading of all ACID meta columns and data columns
+ *
  * Tests reading file with multiple row groups and multiple stripes
  * Sample file used nationFile25kRowsSortedOnNationKey.orc
  * It has replicated version of standard nation table (from file nation.tbl), with original 25 rows replicated into 25000 rows
@@ -67,8 +69,8 @@ public class TestACIDFileWithMultipleRGAndStripes
     public void testFullFileRead()
             throws IOException
     {
-        ConnectorPageSource pageSource = AcidPageProcessorProvider.getAcidPageSource(filename, columnNames, columnTypes);
-        List<NationRow> rows = readFullFile(pageSource, true);
+        ConnectorPageSource pageSource = AcidPageProcessorProvider.getActualPageSourceForAcidFile(filename, columnNames, columnTypes);
+        List<NationRow> rows = readFileCols(pageSource, columnNames, columnTypes, true);
 
         List<NationRow> expected = getExpectedResult(Optional.empty(), Optional.empty());
         assertTrue(Objects.equals(expected, rows));
@@ -76,10 +78,10 @@ public class TestACIDFileWithMultipleRGAndStripes
 
     @Test
     public void testSingleColumnRead()
-            throws IOException
+        throws IOException
     {
         int colToRead = 2;
-        ConnectorPageSource pageSource = AcidPageProcessorProvider.getAcidPageSource(filename, ImmutableList.of(columnNames.get(colToRead)), ImmutableList.of(columnTypes.get(colToRead)));
+        ConnectorPageSource pageSource = AcidPageProcessorProvider.getActualPageSourceForAcidFile(filename, ImmutableList.of(columnNames.get(colToRead)), ImmutableList.of(columnTypes.get(colToRead)));
         List<NationRow> rows = readFileCols(pageSource, ImmutableList.of(columnNames.get(colToRead)), ImmutableList.of(columnTypes.get(colToRead)), true);
 
         List<NationRow> expected = getExpectedResult(Optional.empty(), Optional.of(colToRead));
@@ -104,8 +106,8 @@ public class TestACIDFileWithMultipleRGAndStripes
         TupleDomain<HiveColumnHandle> tupleDomain = TupleDomain.withColumnDomains(
                 ImmutableMap.of(nationKeyColumnHandle, nonExistingDomain));
 
-        ConnectorPageSource pageSource = AcidPageProcessorProvider.getAcidPageSource(filename, columnNames, columnTypes, tupleDomain);
-        List<NationRow> rows = readFullFile(pageSource, true);
+        ConnectorPageSource pageSource = AcidPageProcessorProvider.getActualPageSourceForAcidFile(filename, columnNames, columnTypes, tupleDomain);
+        List<NationRow> rows = readFileCols(pageSource, columnNames, columnTypes, true);
 
         assertTrue(rows.size() == 0);
         assertTrue(((OrcPageSource) pageSource).getRecordReader().isFileSkipped());
@@ -129,8 +131,8 @@ public class TestACIDFileWithMultipleRGAndStripes
         TupleDomain<HiveColumnHandle> tupleDomain = TupleDomain.withColumnDomains(
                 ImmutableMap.of(nationKeyColumnHandle, nonExistingDomain));
 
-        ConnectorPageSource pageSource = AcidPageProcessorProvider.getAcidPageSource(filename, columnNames, columnTypes, tupleDomain);
-        List<NationRow> rows = readFullFile(pageSource, true);
+        ConnectorPageSource pageSource = AcidPageProcessorProvider.getActualPageSourceForAcidFile(filename, columnNames, columnTypes, tupleDomain);
+        List<NationRow> rows = readFileCols(pageSource, columnNames, columnTypes, true);
 
         List<NationRow> expected = getExpectedResult(Optional.of(0), Optional.empty());
         assertTrue(rows.size() != 0);
@@ -138,48 +140,6 @@ public class TestACIDFileWithMultipleRGAndStripes
         assertTrue(((OrcPageSource) pageSource).getRecordReader().stripesRead() == 1);  // 1 out of 5 stripes should be read
         assertTrue(((OrcPageSource) pageSource).getRecordReader().getRowGroupsRead() == 1); // 1 out of 25 rowgroups should be read
         assertTrue(Objects.equals(expected, rows));
-    }
-
-    private List<NationRow> readFullFile(ConnectorPageSource pageSource, boolean resultsNeeded)
-    {
-        List<NationRow> rows = new ArrayList(resultsNeeded ? 25000 : 0);
-        ImmutableList.Builder<Type> expectedReadTypesBuilder = ImmutableList.builder();
-        ImmutableList.Builder<String> expectedReadNamesBuilder = ImmutableList.builder();
-        expectedReadTypesBuilder.add(IntegerType.INTEGER); // operation
-        expectedReadNamesBuilder.add("operation");
-        expectedReadTypesBuilder.add(BigintType.BIGINT);   // originalTxn
-        expectedReadNamesBuilder.add("originalTransaction");
-        expectedReadTypesBuilder.add(IntegerType.INTEGER); // bucket
-        expectedReadNamesBuilder.add("bucket");
-        expectedReadTypesBuilder.add(BigintType.BIGINT);   // rowId
-        expectedReadNamesBuilder.add("rowId");
-        expectedReadTypesBuilder.add(BigintType.BIGINT);   // currentTxn
-        expectedReadNamesBuilder.add("currentTransaction");
-        expectedReadTypesBuilder.addAll(columnTypes);
-        expectedReadNamesBuilder.addAll(columnNames);
-        List<Type> expectedReadTypes = expectedReadTypesBuilder.build();
-        List<String> expectedNames = expectedReadNamesBuilder.build();
-
-        while (!pageSource.isFinished()) {
-            Page page = pageSource.getNextPage();
-            if (page != null) {
-                assertTrue(page.getChannelCount() == 9, "Did not read required number of blocks: " + page.getChannelCount());
-                page = page.getLoadedPage();
-
-                if (!resultsNeeded) {
-                    continue;
-                }
-
-                for (int pos = 0; pos < page.getPositionCount(); pos++) {
-                    ImmutableMap.Builder<String, Object> values = ImmutableMap.builder();
-                    for (int idx = 0; idx < expectedReadTypes.size(); idx++) {
-                        values.put(expectedNames.get(idx), expectedReadTypes.get(idx).getObjectValue(AcidPageProcessorProvider.SESSION, page.getBlock(idx), pos));
-                    }
-                    rows.add(new NationRow(values.build()));
-                }
-            }
-        }
-        return rows;
     }
 
     private List<NationRow> readFileCols(ConnectorPageSource pageSource, List<String> columnNames, List<Type> columnTypes, boolean resultsNeeded)
@@ -205,7 +165,7 @@ public class TestACIDFileWithMultipleRGAndStripes
         while (!pageSource.isFinished()) {
             Page page = pageSource.getNextPage();
             if (page != null) {
-                assertTrue(page.getChannelCount() == expectedNames.size(), "Did not read required number of blocks: " + page.getChannelCount());
+                assertTrue(page.getBlocks().length == expectedNames.size(), "Did not read required number of blocks: " + page.getBlocks().length);
                 page = page.getLoadedPage();
 
                 if (!resultsNeeded) {

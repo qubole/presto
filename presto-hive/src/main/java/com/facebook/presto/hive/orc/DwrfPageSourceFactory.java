@@ -102,6 +102,7 @@ public class DwrfPageSourceFactory
                 getOrcLazyReadSmallRanges(session),
                 false,
                 stats,
-                false));
+                false,
+                true));
     }
 }

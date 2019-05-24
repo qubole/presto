@@ -17,7 +17,6 @@ import com.facebook.presto.hive.FileFormatDataSourceStats;
 import com.facebook.presto.hive.HdfsEnvironment;
 import com.facebook.presto.hive.HiveClientConfig;
 import com.facebook.presto.hive.HiveColumnHandle;
-import com.facebook.presto.hive.HivePageSourceFactory;
 import com.facebook.presto.hive.HiveSessionProperties;
 import com.facebook.presto.hive.HiveStorageFormat;
 import com.facebook.presto.hive.HiveType;
@@ -66,12 +65,24 @@ public class AcidPageProcessorProvider
     {
     }
 
+    // Return ACID page source which reads only the data columns from ACID file and return isValid block additionaly
     public static ConnectorPageSource getAcidPageSource(String fileName, List<String> columnNames, List<Type> columnTypes)
     {
-        return getAcidPageSource(fileName, columnNames, columnTypes, TupleDomain.all());
+        return getAcidPageSource(fileName, columnNames, columnTypes, TupleDomain.all(), false);
     }
 
-    public static ConnectorPageSource getAcidPageSource(String fileName, List<String> columnNames, List<Type> columnTypes, TupleDomain<HiveColumnHandle> tupleDomain)
+    // Return PageSource that reads the underlying ACID file as is
+    public static ConnectorPageSource getActualPageSourceForAcidFile(String fileName, List<String> columnNames, List<Type> columnTypes)
+    {
+        return getAcidPageSource(fileName, columnNames, columnTypes, TupleDomain.all(), true);
+    }
+
+    public static ConnectorPageSource getActualPageSourceForAcidFile(String fileName, List<String> columnNames, List<Type> columnTypes, TupleDomain<HiveColumnHandle> tupleDomain)
+    {
+        return getAcidPageSource(fileName, columnNames, columnTypes, tupleDomain, true);
+    }
+
+    public static ConnectorPageSource getAcidPageSource(String fileName, List<String> columnNames, List<Type> columnTypes, TupleDomain<HiveColumnHandle> tupleDomain, boolean getActualPageSource)
     {
         File targetFile = new File((Thread.currentThread().getContextClassLoader().getResource(fileName).getPath()));
         ImmutableList.Builder<HiveColumnHandle> builder = ImmutableList.builder();
@@ -87,7 +98,7 @@ public class AcidPageProcessorProvider
         }
         List<HiveColumnHandle> columns = builder.build();
 
-        HivePageSourceFactory pageSourceFactory = new OrcPageSourceFactory(TYPE_MANAGER, true, HDFS_ENVIRONMENT, new FileFormatDataSourceStats());
+        OrcPageSourceFactory pageSourceFactory = new OrcPageSourceFactory(TYPE_MANAGER, true, HDFS_ENVIRONMENT, new FileFormatDataSourceStats());
 
         Configuration config = new JobConf(new Configuration(false));
         config.set("fs.file.impl", "org.apache.hadoop.fs.RawLocalFileSystem");
@@ -101,7 +112,8 @@ public class AcidPageProcessorProvider
                 createSchema(HiveStorageFormat.ORC, columnNames, columnTypes),
                 columns,
                 tupleDomain,
-                DateTimeZone.forID(SESSION.getTimeZoneKey().getId())).get();
+                DateTimeZone.forID(SESSION.getTimeZoneKey().getId()),
+                getActualPageSource).get();
     }
 
     private static Properties createSchema(HiveStorageFormat format, List<String> columnNames, List<Type> columnTypes)

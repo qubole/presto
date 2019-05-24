@@ -37,6 +37,7 @@ import com.facebook.presto.spi.predicate.Domain;
 import com.facebook.presto.spi.predicate.TupleDomain;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spi.type.TypeManager;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.airlift.units.DataSize;
@@ -114,6 +115,34 @@ public class OrcPageSourceFactory
             TupleDomain<HiveColumnHandle> effectivePredicate,
             DateTimeZone hiveStorageTimeZone)
     {
+        return createPageSource(
+                configuration,
+                session,
+                path,
+                start,
+                length,
+                fileSize,
+                schema,
+                columns,
+                effectivePredicate,
+                hiveStorageTimeZone,
+                false);
+    }
+
+    @VisibleForTesting
+    public Optional<? extends ConnectorPageSource> createPageSource(
+            Configuration configuration,
+            ConnectorSession session,
+            Path path,
+            long start,
+            long length,
+            long fileSize,
+            Properties schema,
+            List<HiveColumnHandle> columns,
+            TupleDomain<HiveColumnHandle> effectivePredicate,
+            DateTimeZone hiveStorageTimeZone,
+            boolean returnActualPageSource)
+    {
         if (!isDeserializerClass(schema, OrcSerde.class)) {
             return Optional.empty();
         }
@@ -147,7 +176,8 @@ public class OrcPageSourceFactory
                 getOrcLazyReadSmallRanges(session),
                 isOrcBloomFiltersEnabled(session),
                 stats,
-                isFullAcid));
+                isFullAcid,
+                returnActualPageSource));
     }
 
     public static OrcPageSource createOrcPageSource(
@@ -172,7 +202,8 @@ public class OrcPageSourceFactory
             boolean lazyReadSmallRanges,
             boolean orcBloomFiltersEnabled,
             FileFormatDataSourceStats stats,
-            boolean isFullAcid)
+            boolean isFullAcid,
+            boolean returnActualPageSource)
     {
         OrcDataSource orcDataSource;
         try {
@@ -240,6 +271,16 @@ public class OrcPageSourceFactory
                     systemMemoryUsage,
                     INITIAL_BATCH_SIZE,
                     isFullAcid);
+
+            if (isFullAcid && !returnActualPageSource) {
+                return new ACIDOrcPageSource(
+                        recordReader,
+                        orcDataSource,
+                        physicalColumns,
+                        typeManager,
+                        systemMemoryUsage,
+                        stats);
+            }
 
             return new OrcPageSource(
                     recordReader,

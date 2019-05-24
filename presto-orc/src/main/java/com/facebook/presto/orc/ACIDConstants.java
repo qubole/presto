@@ -16,6 +16,10 @@ package com.facebook.presto.orc;
 public class ACIDConstants
 {
     public static final int ACID_META_COLS_COUNT = 5;
+
+    public static final int ACID_ORIGINAL_TXN_INDEX = 1;
+    public static final int ACID_BUCKET_INDEX = 2;
+    public static final int ACID_ROWID_INDEX = 3;
     public static final int ACID_ROW_STRUCT_INDEX = 6;
 
     private ACIDConstants()
