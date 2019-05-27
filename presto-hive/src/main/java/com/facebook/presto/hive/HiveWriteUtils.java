@@ -475,7 +475,7 @@ public final class HiveWriteUtils
 
         // verify table is not ACID table
         if (AcidUtils.isTransactionalTable(parameters)) {
-            throw new PrestoException(NOT_SUPPORTED, format("Inserting into Hive Transcational tables is not supported: %s", tableName));
+            throw new PrestoException(NOT_SUPPORTED, format("Inserting into Hive Transactional tables is not supported: %s", tableName));
         }
     }
 

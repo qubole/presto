@@ -35,7 +35,6 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -70,21 +69,21 @@ public class TestACIDFileWithMultipleRGAndStripes
             throws IOException
     {
         ConnectorPageSource pageSource = AcidPageProcessorProvider.getActualPageSourceForAcidFile(filename, columnNames, columnTypes);
-        List<NationRow> rows = readFileCols(pageSource, columnNames, columnTypes, true);
+        List<RawACIDNationRow> rows = readFileCols(pageSource, columnNames, columnTypes, true);
 
-        List<NationRow> expected = getExpectedResult(Optional.empty(), Optional.empty());
+        List<RawACIDNationRow> expected = getExpectedResult(Optional.empty(), Optional.empty());
         assertTrue(Objects.equals(expected, rows));
     }
 
     @Test
     public void testSingleColumnRead()
-        throws IOException
+            throws IOException
     {
         int colToRead = 2;
         ConnectorPageSource pageSource = AcidPageProcessorProvider.getActualPageSourceForAcidFile(filename, ImmutableList.of(columnNames.get(colToRead)), ImmutableList.of(columnTypes.get(colToRead)));
-        List<NationRow> rows = readFileCols(pageSource, ImmutableList.of(columnNames.get(colToRead)), ImmutableList.of(columnTypes.get(colToRead)), true);
+        List<RawACIDNationRow> rows = readFileCols(pageSource, ImmutableList.of(columnNames.get(colToRead)), ImmutableList.of(columnTypes.get(colToRead)), true);
 
-        List<NationRow> expected = getExpectedResult(Optional.empty(), Optional.of(colToRead));
+        List<RawACIDNationRow> expected = getExpectedResult(Optional.empty(), Optional.of(colToRead));
         assertTrue(Objects.equals(expected, rows));
     }
 
@@ -107,7 +106,7 @@ public class TestACIDFileWithMultipleRGAndStripes
                 ImmutableMap.of(nationKeyColumnHandle, nonExistingDomain));
 
         ConnectorPageSource pageSource = AcidPageProcessorProvider.getActualPageSourceForAcidFile(filename, columnNames, columnTypes, tupleDomain);
-        List<NationRow> rows = readFileCols(pageSource, columnNames, columnTypes, true);
+        List<RawACIDNationRow> rows = readFileCols(pageSource, columnNames, columnTypes, true);
 
         assertTrue(rows.size() == 0);
         assertTrue(((OrcPageSource) pageSource).getRecordReader().isFileSkipped());
@@ -132,9 +131,9 @@ public class TestACIDFileWithMultipleRGAndStripes
                 ImmutableMap.of(nationKeyColumnHandle, nonExistingDomain));
 
         ConnectorPageSource pageSource = AcidPageProcessorProvider.getActualPageSourceForAcidFile(filename, columnNames, columnTypes, tupleDomain);
-        List<NationRow> rows = readFileCols(pageSource, columnNames, columnTypes, true);
+        List<RawACIDNationRow> rows = readFileCols(pageSource, columnNames, columnTypes, true);
 
-        List<NationRow> expected = getExpectedResult(Optional.of(0), Optional.empty());
+        List<RawACIDNationRow> expected = getExpectedResult(Optional.of(0), Optional.empty());
         assertTrue(rows.size() != 0);
         assertFalse(((OrcPageSource) pageSource).getRecordReader().isFileSkipped());
         assertTrue(((OrcPageSource) pageSource).getRecordReader().stripesRead() == 1);  // 1 out of 5 stripes should be read
@@ -142,9 +141,9 @@ public class TestACIDFileWithMultipleRGAndStripes
         assertTrue(Objects.equals(expected, rows));
     }
 
-    private List<NationRow> readFileCols(ConnectorPageSource pageSource, List<String> columnNames, List<Type> columnTypes, boolean resultsNeeded)
+    private List<RawACIDNationRow> readFileCols(ConnectorPageSource pageSource, List<String> columnNames, List<Type> columnTypes, boolean resultsNeeded)
     {
-        List<NationRow> rows = new ArrayList(resultsNeeded ? 25000 : 0);
+        List<RawACIDNationRow> rows = new ArrayList(resultsNeeded ? 25000 : 0);
         ImmutableList.Builder<Type> expectedReadTypesBuilder = ImmutableList.builder();
         ImmutableList.Builder<String> expectedReadNamesBuilder = ImmutableList.builder();
         expectedReadTypesBuilder.add(IntegerType.INTEGER); // operation
@@ -165,7 +164,7 @@ public class TestACIDFileWithMultipleRGAndStripes
         while (!pageSource.isFinished()) {
             Page page = pageSource.getNextPage();
             if (page != null) {
-                assertTrue(page.getBlocks().length == expectedNames.size(), "Did not read required number of blocks: " + page.getBlocks().length);
+                assertTrue(page.getChannelCount() == expectedNames.size(), "Did not read required number of blocks: " + page.getChannelCount());
                 page = page.getLoadedPage();
 
                 if (!resultsNeeded) {
@@ -177,7 +176,7 @@ public class TestACIDFileWithMultipleRGAndStripes
                     for (int idx = 0; idx < expectedReadTypes.size(); idx++) {
                         values.put(expectedNames.get(idx), expectedReadTypes.get(idx).getObjectValue(AcidPageProcessorProvider.SESSION, page.getBlock(idx), pos));
                     }
-                    rows.add(new NationRow(values.build()));
+                    rows.add(new RawACIDNationRow(values.build()));
                 }
             }
         }
@@ -189,11 +188,11 @@ public class TestACIDFileWithMultipleRGAndStripes
      *
      * If onlyForRowId is provided, then only that row from nation.tbls is read and exploded and others are ignored
      */
-    private List<NationRow> getExpectedResult(Optional<Integer> onlyForRowId, Optional<Integer> onlyForColumnId)
+    private List<RawACIDNationRow> getExpectedResult(Optional<Integer> onlyForRowId, Optional<Integer> onlyForColumnId)
             throws IOException
     {
         String nationFilePath = Thread.currentThread().getContextClassLoader().getResource("nation.tbl").getPath();
-        final ImmutableList.Builder<NationRow> result = ImmutableList.builder();
+        final ImmutableList.Builder<RawACIDNationRow> result = ImmutableList.builder();
         long rowId = 0;
         BufferedReader br = new BufferedReader(new FileReader(nationFilePath));
         try {
@@ -213,12 +212,12 @@ public class TestACIDFileWithMultipleRGAndStripes
         return result.build();
     }
 
-    private long replicateIntoResult(String line, ImmutableList.Builder<NationRow> resultBuilder, long startRowId, Optional<Integer> onlyForColumnId)
+    private long replicateIntoResult(String line, ImmutableList.Builder<RawACIDNationRow> resultBuilder, long startRowId, Optional<Integer> onlyForColumnId)
     {
         long replicationFactor = 1000; // same way the nationFile25kRowsSortedOnNationKey.orc is created
         for (int i = 0; i < replicationFactor; i++) {
             String[] cols = line.split("\\|");
-            resultBuilder.add(new NationRow(
+            resultBuilder.add(new RawACIDNationRow(
                     0,
                     2,
                     536870912,
@@ -230,71 +229,5 @@ public class TestACIDFileWithMultipleRGAndStripes
                     (!onlyForColumnId.isPresent() || onlyForColumnId.get() == 3) ? cols[3] : "INVALID"));
         }
         return replicationFactor;
-    }
-
-    private class NationRow
-    {
-        // prefilled values are the fixed ones in nationFile25kRowsSortedOnNationKey.orc
-        int operation;
-        long originalTransaction;
-        int bucket;
-        long rowId;
-        long currentTransaction;
-        int nationkey;
-        String name;
-        int regionkey;
-        String comment;
-
-        public NationRow(Map<String, Object> row)
-        {
-            this(
-                    (Integer) row.getOrDefault("operation", -1),
-                    (Long) row.getOrDefault("originalTransaction", -1),
-                    (Integer) row.getOrDefault("bucket", -1),
-                    (Long) row.getOrDefault("rowId", -1),
-                    (Long) row.getOrDefault("currentTransaction", -1),
-                    (Integer) row.getOrDefault("n_nationkey", -1),
-                    (String) row.getOrDefault("n_name", "INVALID"),
-                    (Integer) row.getOrDefault("n_regionkey", -1),
-                    (String) row.getOrDefault("n_comment", "INVALID"));
-        }
-
-        public NationRow(int operation, long originalTransaction, int bucket, long rowId, long currentTransaction, int nationkey, String name, int regionkey, String comment)
-        {
-            this.operation = operation;
-            this.originalTransaction = originalTransaction;
-            this.bucket = bucket;
-            this.rowId = rowId;
-            this.currentTransaction = currentTransaction;
-            this.nationkey = nationkey;
-            this.name = name;
-            this.regionkey = regionkey;
-            this.comment = comment;
-        }
-
-        @Override
-        public int hashCode()
-        {
-            return Objects.hash(operation, originalTransaction, bucket, rowId, currentTransaction, name, nationkey, regionkey, comment);
-        }
-
-        @Override
-        public boolean equals(Object obj)
-        {
-            if (!(obj instanceof NationRow)) {
-                return false;
-            }
-
-            NationRow other = (NationRow) obj;
-            return (operation == other.operation
-                    && originalTransaction == other.originalTransaction
-                    && bucket == other.bucket
-                    && rowId == other.rowId
-                    && currentTransaction == other.currentTransaction
-                    && nationkey == other.nationkey
-                    && name.equals(other.name)
-                    && regionkey == other.regionkey
-                    && comment.equals(other.comment));
-        }
     }
 }

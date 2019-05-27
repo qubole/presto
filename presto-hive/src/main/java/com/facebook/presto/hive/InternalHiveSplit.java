@@ -57,6 +57,7 @@ public class InternalHiveSplit
     private final boolean forceLocalScheduling;
     private final Map<Integer, HiveTypeName> columnCoercions;
     private final Optional<BucketConversion> bucketConversion;
+    private final Optional<DeleteDeltaLocations> deleteDetlaLocations;
 
     private long start;
     private int currentBlockIndex;
@@ -74,7 +75,8 @@ public class InternalHiveSplit
             boolean splittable,
             boolean forceLocalScheduling,
             Map<Integer, HiveTypeName> columnCoercions,
-            Optional<BucketConversion> bucketConversion)
+            Optional<BucketConversion> bucketConversion,
+            Optional<DeleteDeltaLocations> deleteDetlaLocations)
     {
         checkArgument(start >= 0, "start must be positive");
         checkArgument(end >= 0, "length must be positive");
@@ -87,6 +89,7 @@ public class InternalHiveSplit
         requireNonNull(bucketNumber, "bucketNumber is null");
         requireNonNull(columnCoercions, "columnCoercions is null");
         requireNonNull(bucketConversion, "bucketConversion is null");
+        requireNonNull(deleteDetlaLocations, "deleteDeltaLocations is null");
 
         this.partitionName = partitionName;
         this.path = path;
@@ -101,6 +104,7 @@ public class InternalHiveSplit
         this.forceLocalScheduling = forceLocalScheduling;
         this.columnCoercions = ImmutableMap.copyOf(columnCoercions);
         this.bucketConversion = bucketConversion;
+        this.deleteDetlaLocations = deleteDetlaLocations;
     }
 
     public String getPath()
@@ -204,6 +208,11 @@ public class InternalHiveSplit
             result += INTEGER_INSTANCE_SIZE + hiveTypeName.getEstimatedSizeInBytes();
         }
         return result;
+    }
+
+    public Optional<DeleteDeltaLocations> getDeleteDetlaLocations()
+    {
+        return deleteDetlaLocations;
     }
 
     @Override

@@ -13,9 +13,9 @@
  */
 package com.facebook.presto.hive.acid;
 
+import com.facebook.presto.hive.DeleteDeltaLocations;
 import com.facebook.presto.spi.ConnectorPageSource;
 import com.facebook.presto.spi.Page;
-import com.facebook.presto.spi.type.BigintType;
 import com.facebook.presto.spi.type.BooleanType;
 import com.facebook.presto.spi.type.IntegerType;
 import com.facebook.presto.spi.type.Type;
@@ -29,10 +29,10 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
+import static com.facebook.presto.hive.acid.AcidPageProcessorProvider.addNationTableDeleteDeltas;
 import static org.testng.Assert.assertTrue;
 
 /*
@@ -46,29 +46,43 @@ public class TestACIDOrcPageSource
     private List<Type> columnTypes = ImmutableList.of(IntegerType.INTEGER, VarcharType.VARCHAR, IntegerType.INTEGER, VarcharType.VARCHAR);
 
     @Test
-    public void testFullFileRead()
+    public void testFullFileReadWithoutDeleteDeltas()
             throws IOException
     {
         ConnectorPageSource pageSource = AcidPageProcessorProvider.getAcidPageSource(filename, columnNames, columnTypes);
         List<AcidNationRow> rows = readFileCols(pageSource, columnNames, columnTypes, true);
 
-        List<AcidNationRow> expected = getExpectedResult(Optional.empty(), Optional.empty());
+        List<AcidNationRow> expected = getExpectedResult(Optional.empty(), Optional.empty(), Optional.empty());
         assertTrue(Objects.equals(expected, rows));
     }
 
     @Test
-    public void testSingleColumnRead()
+    public void testFullFileReadWithDeleteDeltas()
+            throws IOException
+    {
+        DeleteDeltaLocations deleteDeltaLocations = new DeleteDeltaLocations();
+        addNationTableDeleteDeltas(deleteDeltaLocations, 3L, 3L, 0);
+        addNationTableDeleteDeltas(deleteDeltaLocations, 4L, 4L, 0);
+        ConnectorPageSource pageSource = AcidPageProcessorProvider.getAcidPageSource(filename, columnNames, columnTypes, Optional.of(deleteDeltaLocations));
+        List<AcidNationRow> rows = readFileCols(pageSource, columnNames, columnTypes, true);
+
+        List<AcidNationRow> expected = getExpectedResult(Optional.empty(), Optional.empty(), Optional.of(ImmutableList.of(5, 19)));
+        assertTrue(Objects.equals(expected, rows));
+    }
+
+    @Test
+    public void testSingleColumnReadWithoutDeleteDeltas()
             throws IOException
     {
         int colToRead = 2;
         ConnectorPageSource pageSource = AcidPageProcessorProvider.getAcidPageSource(filename, ImmutableList.of(columnNames.get(colToRead)), ImmutableList.of(columnTypes.get(colToRead)));
         List<AcidNationRow> rows = readFileCols(pageSource, ImmutableList.of(columnNames.get(colToRead)), ImmutableList.of(columnTypes.get(colToRead)), true);
 
-        List<AcidNationRow> expected = getExpectedResult(Optional.empty(), Optional.of(colToRead));
+        List<AcidNationRow> expected = getExpectedResult(Optional.empty(), Optional.of(colToRead), Optional.empty());
         assertTrue(Objects.equals(expected, rows));
     }
 
-    private List<AcidNationRow> readFileCols(ConnectorPageSource pageSource, List<String> columnNames, List<Type> columnTypes, boolean resultsNeeded)
+    public static List<AcidNationRow> readFileCols(ConnectorPageSource pageSource, List<String> columnNames, List<Type> columnTypes, boolean resultsNeeded)
     {
         List<AcidNationRow> rows = new ArrayList(resultsNeeded ? 25000 : 0);
         ImmutableList.Builder<Type> expectedReadTypesBuilder = ImmutableList.builder();
@@ -84,7 +98,7 @@ public class TestACIDOrcPageSource
         while (!pageSource.isFinished()) {
             Page page = pageSource.getNextPage();
             if (page != null) {
-                assertTrue(page.getBlocks().length == expectedNames.size(), "Did not read required number of blocks: " + page.getBlocks().length);
+                assertTrue(page.getChannelCount() == expectedNames.size(), "Did not read required number of blocks: " + page.getChannelCount());
                 page = page.getLoadedPage();
 
                 if (!resultsNeeded) {
@@ -108,7 +122,7 @@ public class TestACIDOrcPageSource
      *
      * If onlyForRowId is provided, then only that row from nation.tbls is read and exploded and others are ignored
      */
-    private List<AcidNationRow> getExpectedResult(Optional<Integer> onlyForRowId, Optional<Integer> onlyForColumnId)
+    public static List<AcidNationRow> getExpectedResult(Optional<Integer> onlyForRowId, Optional<Integer> onlyForColumnId, Optional<List<Integer>> invalidRows)
             throws IOException
     {
         String nationFilePath = Thread.currentThread().getContextClassLoader().getResource("nation.tbl").getPath();
@@ -123,7 +137,11 @@ public class TestACIDOrcPageSource
                 if (onlyForRowId.isPresent() && onlyForRowId.get() != lineNum) {
                     continue;
                 }
-                rowId += replicateIntoResult(line, result, rowId, onlyForColumnId);
+                boolean isValid = true;
+                if (invalidRows.isPresent() && invalidRows.get().contains(lineNum)) {
+                    isValid = false;
+                }
+                rowId += replicateIntoResult(line, result, rowId, onlyForColumnId, isValid);
             }
         }
         finally {
@@ -132,7 +150,7 @@ public class TestACIDOrcPageSource
         return result.build();
     }
 
-    private long replicateIntoResult(String line, ImmutableList.Builder<AcidNationRow> resultBuilder, long startRowId, Optional<Integer> onlyForColumnId)
+    public static long replicateIntoResult(String line, ImmutableList.Builder<AcidNationRow> resultBuilder, long startRowId, Optional<Integer> onlyForColumnId, boolean isValid)
     {
         long replicationFactor = 1000; // same way the nationFile25kRowsSortedOnNationKey.orc is created
         for (int i = 0; i < replicationFactor; i++) {
@@ -142,57 +160,8 @@ public class TestACIDOrcPageSource
                     (!onlyForColumnId.isPresent() || onlyForColumnId.get() == 1) ? cols[1] : "INVALID",
                     (!onlyForColumnId.isPresent() || onlyForColumnId.get() == 2) ? Integer.parseInt(cols[2]) : -1,
                     (!onlyForColumnId.isPresent() || onlyForColumnId.get() == 3) ? cols[3] : "INVALID",
-                    true));
+                    isValid));
         }
         return replicationFactor;
-    }
-
-    private class AcidNationRow
-    {
-        int nationkey;
-        String name;
-        int regionkey;
-        String comment;
-        boolean isValid;
-
-        public AcidNationRow(Map<String, Object> row)
-        {
-            this(
-                    (Integer) row.getOrDefault("n_nationkey", -1),
-                    (String) row.getOrDefault("n_name", "INVALID"),
-                    (Integer) row.getOrDefault("n_regionkey", -1),
-                    (String) row.getOrDefault("n_comment", "INVALID"),
-                    (Boolean) row.get("isValid"));
-        }
-
-        public AcidNationRow(int nationkey, String name, int regionkey, String comment, boolean isValid)
-        {
-            this.nationkey = nationkey;
-            this.name = name;
-            this.regionkey = regionkey;
-            this.comment = comment;
-            this.isValid = isValid;
-        }
-
-        @Override
-        public int hashCode()
-        {
-            return Objects.hash(name, nationkey, regionkey, comment, isValid);
-        }
-
-        @Override
-        public boolean equals(Object obj)
-        {
-            if (!(obj instanceof AcidNationRow)) {
-                return false;
-            }
-
-            AcidNationRow other = (AcidNationRow) obj;
-            return (nationkey == other.nationkey
-                    && name.equals(other.name)
-                    && regionkey == other.regionkey
-                    && comment.equals(other.comment)
-                    && isValid == other.isValid);
-        }
     }
 }

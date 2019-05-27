@@ -13,10 +13,13 @@
  */
 package com.facebook.presto.hive.acid;
 
+import com.facebook.presto.hive.DeleteDeltaLocations;
 import com.facebook.presto.hive.FileFormatDataSourceStats;
+import com.facebook.presto.hive.HdfsConfigurationUpdater;
 import com.facebook.presto.hive.HdfsEnvironment;
 import com.facebook.presto.hive.HiveClientConfig;
 import com.facebook.presto.hive.HiveColumnHandle;
+import com.facebook.presto.hive.HiveHdfsConfiguration;
 import com.facebook.presto.hive.HiveSessionProperties;
 import com.facebook.presto.hive.HiveStorageFormat;
 import com.facebook.presto.hive.HiveType;
@@ -24,6 +27,9 @@ import com.facebook.presto.hive.HiveTypeName;
 import com.facebook.presto.hive.HiveTypeTranslator;
 import com.facebook.presto.hive.OrcFileWriterConfig;
 import com.facebook.presto.hive.TypeTranslator;
+import com.facebook.presto.hive.authentication.NoHdfsAuthentication;
+import com.facebook.presto.hive.orc.ACIDOrcPageSourceFactory;
+import com.facebook.presto.hive.orc.DeletedRowsRegistry;
 import com.facebook.presto.hive.orc.OrcPageSourceFactory;
 import com.facebook.presto.spi.ConnectorPageSource;
 import com.facebook.presto.spi.ConnectorSession;
@@ -33,6 +39,7 @@ import com.facebook.presto.testing.TestingConnectorSession;
 import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.ql.io.AcidUtils;
 import org.apache.hadoop.mapred.JobConf;
 import org.joda.time.DateTimeZone;
 
@@ -43,7 +50,6 @@ import java.util.Properties;
 
 import static com.facebook.presto.hive.HiveColumnHandle.ColumnType.REGULAR;
 import static com.facebook.presto.hive.HiveTestUtils.TYPE_MANAGER;
-import static com.facebook.presto.hive.HiveTestUtils.createTestHdfsEnvironment;
 import static com.facebook.presto.hive.HiveType.toHiveType;
 import static java.util.stream.Collectors.joining;
 import static org.apache.hadoop.hive.metastore.api.hive_metastoreConstants.FILE_INPUT_FORMAT;
@@ -54,12 +60,12 @@ import static org.apache.hadoop.hive.serde.serdeConstants.SERIALIZATION_LIB;
 
 public class AcidPageProcessorProvider
 {
-    private static final HiveClientConfig CONFIG = new HiveClientConfig()
+    public static final HiveClientConfig CONFIG = new HiveClientConfig()
             .setParquetOptimizedReaderEnabled(true)
             .setUseOrcColumnNames(true);
     public static final ConnectorSession SESSION = new TestingConnectorSession(new HiveSessionProperties(CONFIG, new OrcFileWriterConfig())
             .getSessionProperties());
-    private static final HdfsEnvironment HDFS_ENVIRONMENT = createTestHdfsEnvironment(CONFIG);
+    public static final HdfsEnvironment HDFS_ENVIRONMENT = new HdfsEnvironment(new HiveHdfsConfiguration(new HdfsConfigurationUpdater(CONFIG)), CONFIG, new NoHdfsAuthentication());
 
     private AcidPageProcessorProvider()
     {
@@ -69,6 +75,11 @@ public class AcidPageProcessorProvider
     public static ConnectorPageSource getAcidPageSource(String fileName, List<String> columnNames, List<Type> columnTypes)
     {
         return getAcidPageSource(fileName, columnNames, columnTypes, TupleDomain.all(), false);
+    }
+
+    public static ConnectorPageSource getAcidPageSource(String fileName, List<String> columnNames, List<Type> columnTypes, Optional<DeleteDeltaLocations> deleteDeltaLocations)
+    {
+        return getAcidPageSource(fileName, columnNames, columnTypes, TupleDomain.all(), deleteDeltaLocations, false);
     }
 
     // Return PageSource that reads the underlying ACID file as is
@@ -84,6 +95,17 @@ public class AcidPageProcessorProvider
 
     public static ConnectorPageSource getAcidPageSource(String fileName, List<String> columnNames, List<Type> columnTypes, TupleDomain<HiveColumnHandle> tupleDomain, boolean getActualPageSource)
     {
+        return getAcidPageSource(fileName, columnNames, columnTypes, tupleDomain, Optional.empty(), getActualPageSource);
+    }
+
+    public static ConnectorPageSource getAcidPageSource(
+            String fileName,
+            List<String> columnNames,
+            List<Type> columnTypes,
+            TupleDomain<HiveColumnHandle> tupleDomain,
+            Optional<DeleteDeltaLocations> deleteDeltaLocations,
+            boolean getActualPageSource)
+    {
         File targetFile = new File((Thread.currentThread().getContextClassLoader().getResource(fileName).getPath()));
         ImmutableList.Builder<HiveColumnHandle> builder = ImmutableList.builder();
         for (int i = 0; i < columnNames.size(); i++) {
@@ -98,7 +120,8 @@ public class AcidPageProcessorProvider
         }
         List<HiveColumnHandle> columns = builder.build();
 
-        OrcPageSourceFactory pageSourceFactory = new OrcPageSourceFactory(TYPE_MANAGER, true, HDFS_ENVIRONMENT, new FileFormatDataSourceStats());
+        OrcPageSourceFactory orcPageSourceFactory = new OrcPageSourceFactory(TYPE_MANAGER, true, HDFS_ENVIRONMENT, new FileFormatDataSourceStats());
+        ACIDOrcPageSourceFactory pageSourceFactory = new ACIDOrcPageSourceFactory(TYPE_MANAGER, CONFIG, HDFS_ENVIRONMENT, new FileFormatDataSourceStats(), orcPageSourceFactory);
 
         Configuration config = new JobConf(new Configuration(false));
         config.set("fs.file.impl", "org.apache.hadoop.fs.RawLocalFileSystem");
@@ -113,6 +136,7 @@ public class AcidPageProcessorProvider
                 columns,
                 tupleDomain,
                 DateTimeZone.forID(SESSION.getTimeZoneKey().getId()),
+                deleteDeltaLocations,
                 getActualPageSource).get();
     }
 
@@ -131,5 +155,30 @@ public class AcidPageProcessorProvider
                 .collect(joining(":")));
         schema.setProperty(TABLE_IS_TRANSACTIONAL, "true");
         return schema;
+    }
+
+    public static DeletedRowsRegistry createDeletedRowsRegistry(Optional<DeleteDeltaLocations> deleteDeltaLocations)
+    {
+        OrcPageSourceFactory pageSourceFactory = new OrcPageSourceFactory(TYPE_MANAGER, true, HDFS_ENVIRONMENT, new FileFormatDataSourceStats());
+
+        Configuration config = new JobConf(new Configuration(false));
+        config.set("fs.file.impl", "org.apache.hadoop.fs.RawLocalFileSystem");
+        return new DeletedRowsRegistry(
+                pageSourceFactory,
+                SESSION,
+                config,
+                DateTimeZone.forID(SESSION.getTimeZoneKey().getId()),
+                HDFS_ENVIRONMENT,
+                CONFIG.getDeleteDeltaCacheSize(),
+                CONFIG.getDeleteDeltaCacheTTL(),
+                deleteDeltaLocations);
+    }
+
+    public static void addNationTableDeleteDeltas(DeleteDeltaLocations deleteDeltaLocations, long minWriteId, long maxWriteId, int statementId)
+    {
+        // ClassLoader finds top level resources, find that and build delta locations from it
+        File partitionLocation = new File((Thread.currentThread().getContextClassLoader().getResource("nation_delete_deltas").getPath()));
+        Path deleteDeltaPath = new Path(new Path(partitionLocation.toString()), AcidUtils.deleteDeltaSubdir(minWriteId, maxWriteId, statementId));
+        deleteDeltaLocations.addDeleteDelta(deleteDeltaPath, minWriteId, maxWriteId, statementId);
     }
 }

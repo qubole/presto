@@ -17,10 +17,14 @@ public class ACIDConstants
 {
     public static final int ACID_META_COLS_COUNT = 5;
 
+    public static final int ACID_OPERATION_INDEX = 0;
     public static final int ACID_ORIGINAL_TXN_INDEX = 1;
     public static final int ACID_BUCKET_INDEX = 2;
     public static final int ACID_ROWID_INDEX = 3;
+    public static final int ACID_CURRENT_TXN_INDEX = 4;
     public static final int ACID_ROW_STRUCT_INDEX = 6;
+
+    public static final String[] ACID_META_COLUMNS = {"operation", "originalTransaction", "bucket", "rowId", "currentTransaction"};
 
     private ACIDConstants()
     {

@@ -139,6 +139,8 @@ public class HiveClientConfig
     private boolean collectColumnStatisticsOnWrite;
 
     private Duration hiveTxnHeartBeatInterval = new Duration(5, TimeUnit.SECONDS);
+    private DataSize deleteDeltaCacheSize = new DataSize(100, DataSize.Unit.MEGABYTE);
+    private Duration deleteDeltaCacheTTL = new Duration(5, TimeUnit.MINUTES);
 
     public int getMaxInitialSplits()
     {
@@ -1102,5 +1104,35 @@ public class HiveClientConfig
     public Duration getHiveTxnHeartBeatInterval()
     {
         return hiveTxnHeartBeatInterval;
+    }
+
+    @Config("hive.delete-delta-cache-size")
+    @ConfigDescription("Maximum size of cache of Deleted Rows in ACID table")
+    public HiveClientConfig setDeleteDeltaCacheSize(DataSize size)
+    {
+        this.deleteDeltaCacheSize = size;
+        return this;
+    }
+
+    // Size of entries in DeletedRows cache is measured in bytes because they can be small for general cases and
+    // tracking them higher than that would keep cache size to 0 (due to precision loss in higher Units and casting to int)
+    // And Integer can only take 2GB before overflow so limit the cache size
+    @MaxDataSize("2GB")
+    public DataSize getDeleteDeltaCacheSize()
+    {
+        return deleteDeltaCacheSize;
+    }
+
+    @Config("hive.delete-delta-cache-ttl")
+    @ConfigDescription("Maximum time to keep entries for a partition for a query in Deleted Rows cache after last access")
+    public HiveClientConfig setDeleteDeltaCacheTTL(Duration interval)
+    {
+        this.deleteDeltaCacheTTL = interval;
+        return this;
+    }
+
+    public Duration getDeleteDeltaCacheTTL()
+    {
+        return deleteDeltaCacheTTL;
     }
 }

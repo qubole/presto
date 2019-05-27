@@ -37,4 +37,30 @@ public interface HivePageSourceFactory
             List<HiveColumnHandle> columns,
             TupleDomain<HiveColumnHandle> effectivePredicate,
             DateTimeZone hiveStorageTimeZone);
+
+    default Optional<? extends ConnectorPageSource> createPageSource(
+            Configuration configuration,
+            ConnectorSession session,
+            Path path,
+            long start,
+            long length,
+            long fileSize,
+            Properties schema,
+            List<HiveColumnHandle> columns,
+            TupleDomain<HiveColumnHandle> effectivePredicate,
+            DateTimeZone hiveStorageTimeZone,
+            Optional<DeleteDeltaLocations> deleteDeltaLocations)
+    {
+        return createPageSource(
+                configuration,
+                session,
+                path,
+                start,
+                length,
+                fileSize,
+                schema,
+                columns,
+                effectivePredicate,
+                hiveStorageTimeZone);
+    }
 }

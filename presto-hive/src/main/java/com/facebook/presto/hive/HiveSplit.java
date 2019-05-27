@@ -50,6 +50,7 @@ public class HiveSplit
     private final boolean forceLocalScheduling;
     private final Map<Integer, HiveType> columnCoercions; // key: hiveColumnIndex
     private final Optional<BucketConversion> bucketConversion;
+    private final Optional<DeleteDeltaLocations> deleteDetlaLocations;
 
     @JsonCreator
     public HiveSplit(
@@ -67,7 +68,8 @@ public class HiveSplit
             @JsonProperty("forceLocalScheduling") boolean forceLocalScheduling,
             @JsonProperty("effectivePredicate") TupleDomain<HiveColumnHandle> effectivePredicate,
             @JsonProperty("columnCoercions") Map<Integer, HiveType> columnCoercions,
-            @JsonProperty("bucketConversion") Optional<BucketConversion> bucketConversion)
+            @JsonProperty("bucketConversion") Optional<BucketConversion> bucketConversion,
+            @JsonProperty("deleteDetlaLocations") Optional<DeleteDeltaLocations> deleteDetlaLocations)
     {
         checkArgument(start >= 0, "start must be positive");
         checkArgument(length >= 0, "length must be positive");
@@ -83,6 +85,7 @@ public class HiveSplit
         requireNonNull(effectivePredicate, "tupleDomain is null");
         requireNonNull(columnCoercions, "columnCoercions is null");
         requireNonNull(bucketConversion, "bucketConversion is null");
+        requireNonNull(deleteDetlaLocations, "deleteDeltaLocations is null");
 
         this.database = database;
         this.table = table;
@@ -99,6 +102,7 @@ public class HiveSplit
         this.effectivePredicate = effectivePredicate;
         this.columnCoercions = columnCoercions;
         this.bucketConversion = bucketConversion;
+        this.deleteDetlaLocations = deleteDetlaLocations;
     }
 
     @JsonProperty
@@ -196,6 +200,12 @@ public class HiveSplit
     public boolean isRemotelyAccessible()
     {
         return !forceLocalScheduling;
+    }
+
+    @JsonProperty
+    public Optional<DeleteDeltaLocations> getDeleteDetlaLocations()
+    {
+        return deleteDetlaLocations;
     }
 
     @Override

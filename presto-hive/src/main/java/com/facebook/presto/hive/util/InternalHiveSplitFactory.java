@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.hive.util;
 
+import com.facebook.presto.hive.DeleteDeltaLocations;
 import com.facebook.presto.hive.HiveColumnHandle;
 import com.facebook.presto.hive.HivePartitionKey;
 import com.facebook.presto.hive.HiveSplit.BucketConversion;
@@ -86,9 +87,9 @@ public class InternalHiveSplitFactory
         return partitionName;
     }
 
-    public Optional<InternalHiveSplit> createInternalHiveSplit(LocatedFileStatus status, boolean splittable)
+    public Optional<InternalHiveSplit> createInternalHiveSplit(LocatedFileStatus status, boolean splittable, Optional<DeleteDeltaLocations> deleteDetlaLocations)
     {
-        return createInternalHiveSplit(status, OptionalInt.empty(), splittable);
+        return createInternalHiveSplit(status, OptionalInt.empty(), splittable, deleteDetlaLocations);
     }
 
     public Optional<InternalHiveSplit> createInternalHiveSplit(LocatedFileStatus status, int bucketNumber)
@@ -98,6 +99,11 @@ public class InternalHiveSplitFactory
 
     private Optional<InternalHiveSplit> createInternalHiveSplit(LocatedFileStatus status, OptionalInt bucketNumber, boolean splittable)
     {
+        return createInternalHiveSplit(status, bucketNumber, splittable, Optional.empty());
+    }
+
+    private Optional<InternalHiveSplit> createInternalHiveSplit(LocatedFileStatus status, OptionalInt bucketNumber, boolean splittable, Optional<DeleteDeltaLocations> deleteDetlaLocations)
+    {
         splittable = splittable && isSplittable(inputFormat, fileSystem, status.getPath());
         return createInternalHiveSplit(
                 status.getPath(),
@@ -106,7 +112,8 @@ public class InternalHiveSplitFactory
                 status.getLen(),
                 status.getLen(),
                 bucketNumber,
-                splittable);
+                splittable,
+                deleteDetlaLocations);
     }
 
     public Optional<InternalHiveSplit> createInternalHiveSplit(FileSplit split)
@@ -131,6 +138,19 @@ public class InternalHiveSplitFactory
             long fileSize,
             OptionalInt bucketNumber,
             boolean splittable)
+    {
+        return createInternalHiveSplit(path, blockLocations, start, length, fileSize, bucketNumber, splittable, Optional.empty());
+    }
+
+    public Optional<InternalHiveSplit> createInternalHiveSplit(
+            Path path,
+            BlockLocation[] blockLocations,
+            long start,
+            long length,
+            long fileSize,
+            OptionalInt bucketNumber,
+            boolean splittable,
+            Optional<DeleteDeltaLocations> deleteDetlaLocations)
     {
         String pathString = path.toString();
         if (!pathMatchesPredicate(pathDomain, pathString)) {
@@ -184,7 +204,8 @@ public class InternalHiveSplitFactory
                 splittable,
                 forceLocalScheduling && allBlocksHaveRealAddress(blocks),
                 columnCoercions,
-                bucketConversion));
+                bucketConversion,
+                deleteDetlaLocations));
     }
 
     private static void checkBlocks(List<InternalHiveBlock> blocks, long start, long length)

@@ -42,6 +42,7 @@ import java.util.OptionalInt;
 import java.util.Properties;
 import java.util.Set;
 
+import static com.facebook.presto.hive.HiveColumnHandle.ColumnType.ACID_ROW_VALIDITY;
 import static com.facebook.presto.hive.HiveColumnHandle.ColumnType.PARTITION_KEY;
 import static com.facebook.presto.hive.HiveColumnHandle.ColumnType.REGULAR;
 import static com.facebook.presto.hive.HiveColumnHandle.ColumnType.SYNTHESIZED;
@@ -107,7 +108,8 @@ public class HivePageSourceProvider
                 hiveStorageTimeZone,
                 typeManager,
                 hiveSplit.getColumnCoercions(),
-                hiveSplit.getBucketConversion());
+                hiveSplit.getBucketConversion(),
+                hiveSplit.getDeleteDetlaLocations());
         if (pageSource.isPresent()) {
             return pageSource.get();
         }
@@ -132,6 +134,47 @@ public class HivePageSourceProvider
             TypeManager typeManager,
             Map<Integer, HiveType> columnCoercions,
             Optional<BucketConversion> bucketConversion)
+    {
+        return createHivePageSource(
+                cursorProviders,
+                pageSourceFactories,
+                configuration,
+                session,
+                path,
+                bucketNumber,
+                start,
+                length,
+                fileSize,
+                schema,
+                effectivePredicate,
+                hiveColumns,
+                partitionKeys,
+                hiveStorageTimeZone,
+                typeManager,
+                columnCoercions,
+                bucketConversion,
+                Optional.empty());
+    }
+
+    public static Optional<ConnectorPageSource> createHivePageSource(
+            Set<HiveRecordCursorProvider> cursorProviders,
+            Set<HivePageSourceFactory> pageSourceFactories,
+            Configuration configuration,
+            ConnectorSession session,
+            Path path,
+            OptionalInt bucketNumber,
+            long start,
+            long length,
+            long fileSize,
+            Properties schema,
+            TupleDomain<HiveColumnHandle> effectivePredicate,
+            List<HiveColumnHandle> hiveColumns,
+            List<HivePartitionKey> partitionKeys,
+            DateTimeZone hiveStorageTimeZone,
+            TypeManager typeManager,
+            Map<Integer, HiveType> columnCoercions,
+            Optional<BucketConversion> bucketConversion,
+            Optional<DeleteDeltaLocations> deleteDeltaLocations)
     {
         List<ColumnMapping> columnMappings = ColumnMapping.buildColumnMappings(
                 partitionKeys,
@@ -164,7 +207,8 @@ public class HivePageSourceProvider
                     schema,
                     toColumnHandles(regularAndInterimColumnMappings, true),
                     effectivePredicate,
-                    hiveStorageTimeZone);
+                    hiveStorageTimeZone,
+                    deleteDeltaLocations);
             if (pageSource.isPresent()) {
                 return Optional.of(
                         new HivePageSource(
@@ -245,6 +289,12 @@ public class HivePageSourceProvider
             return new ColumnMapping(ColumnMappingKind.REGULAR, hiveColumnHandle, Optional.empty(), OptionalInt.of(index), coerceFrom);
         }
 
+        public static ColumnMapping generated(HiveColumnHandle hiveColumnHandle, int index, Optional<HiveType> coerceFrom)
+        {
+            checkArgument(hiveColumnHandle.getColumnType() == ACID_ROW_VALIDITY);
+            return new ColumnMapping(ColumnMappingKind.GENERATED, hiveColumnHandle, Optional.empty(), OptionalInt.of(index), coerceFrom);
+        }
+
         public static ColumnMapping prefilled(HiveColumnHandle hiveColumnHandle, String prefilledValue, Optional<HiveType> coerceFrom)
         {
             checkArgument(hiveColumnHandle.getColumnType() == PARTITION_KEY || hiveColumnHandle.getColumnType() == SYNTHESIZED);
@@ -284,7 +334,7 @@ public class HivePageSourceProvider
 
         public int getIndex()
         {
-            checkState(kind == ColumnMappingKind.REGULAR || kind == ColumnMappingKind.INTERIM);
+            checkState(kind == ColumnMappingKind.REGULAR || kind == ColumnMappingKind.INTERIM || kind == ColumnMappingKind.GENERATED);
             return index.getAsInt();
         }
 
@@ -316,6 +366,12 @@ public class HivePageSourceProvider
                 if (column.getColumnType() == REGULAR) {
                     checkArgument(regularColumnIndices.add(column.getHiveColumnIndex()), "duplicate hiveColumnIndex in columns list");
                     columnMappings.add(regular(column, regularIndex, coercionFrom));
+                    regularIndex++;
+                }
+                else if (column.getColumnType() == ACID_ROW_VALIDITY) {
+                    // isValid is a special column, it behaves like a REGULAR column as it is available for FilterOperator but it is generated rather than read from file
+                    checkArgument(regularColumnIndices.add(column.getHiveColumnIndex()), "duplicate hiveColumnIndex in columns list");
+                    columnMappings.add(generated(column, regularIndex, coercionFrom));
                     regularIndex++;
                 }
                 else {
@@ -371,6 +427,7 @@ public class HivePageSourceProvider
         REGULAR,
         PREFILLED,
         INTERIM,
+        GENERATED,
     }
 
     public static class BucketAdaptation

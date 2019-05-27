@@ -19,6 +19,7 @@ import com.facebook.presto.spi.predicate.TupleDomain;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.airlift.json.JsonCodec;
+import org.apache.hadoop.fs.Path;
 import org.testng.annotations.Test;
 
 import java.util.Optional;
@@ -29,6 +30,7 @@ import static com.facebook.presto.hive.HiveType.HIVE_LONG;
 import static com.facebook.presto.hive.HiveType.HIVE_STRING;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 public class TestHiveSplit
 {
@@ -61,7 +63,8 @@ public class TestHiveSplit
                 Optional.of(new HiveSplit.BucketConversion(
                         32,
                         16,
-                        ImmutableList.of(new HiveColumnHandle("col", HIVE_LONG, BIGINT.getTypeSignature(), 5, ColumnType.REGULAR, Optional.of("comment"))))));
+                        ImmutableList.of(new HiveColumnHandle("col", HIVE_LONG, BIGINT.getTypeSignature(), 5, ColumnType.REGULAR, Optional.of("comment"))))),
+                Optional.empty());
 
         String json = codec.toJson(expected);
         HiveSplit actual = codec.fromJson(json);
@@ -79,5 +82,58 @@ public class TestHiveSplit
         assertEquals(actual.getColumnCoercions(), expected.getColumnCoercions());
         assertEquals(actual.getBucketConversion(), expected.getBucketConversion());
         assertEquals(actual.isForceLocalScheduling(), expected.isForceLocalScheduling());
+    }
+
+    @Test
+    public void testJsonRoundTripWithDeleteDeltas()
+    {
+        Properties schema = new Properties();
+        schema.setProperty("foo", "bar");
+        schema.setProperty("bar", "baz");
+
+        ImmutableList<HivePartitionKey> partitionKeys = ImmutableList.of(new HivePartitionKey("a", "apple"), new HivePartitionKey("b", "42"));
+        ImmutableList<HostAddress> addresses = ImmutableList.of(HostAddress.fromParts("127.0.0.1", 44), HostAddress.fromParts("127.0.0.1", 45));
+        DeleteDeltaLocations deleteDeltaLocations = new DeleteDeltaLocations();
+        deleteDeltaLocations.addDeleteDelta(new Path("file:///data/fullacid/delete_delta_0000004_0000004_0000"), 4L, 4L, 0);
+        deleteDeltaLocations.addDeleteDelta(new Path("file:///data/fullacid/delete_delta_0000007_0000007_0000"), 7L, 7L, 0);
+        HiveSplit expected = new HiveSplit(
+                "db",
+                "table",
+                "partitionId",
+                "path",
+                42,
+                87,
+                88,
+                schema,
+                partitionKeys,
+                addresses,
+                OptionalInt.empty(),
+                true,
+                TupleDomain.all(),
+                ImmutableMap.of(1, HIVE_STRING),
+                Optional.of(new HiveSplit.BucketConversion(
+                        32,
+                        16,
+                        ImmutableList.of(new HiveColumnHandle("col", HIVE_LONG, BIGINT.getTypeSignature(), 5, ColumnType.REGULAR, Optional.of("comment"))))),
+                Optional.of(deleteDeltaLocations));
+
+        String json = codec.toJson(expected);
+        HiveSplit actual = codec.fromJson(json);
+
+        assertEquals(actual.getDatabase(), expected.getDatabase());
+        assertEquals(actual.getTable(), expected.getTable());
+        assertEquals(actual.getPartitionName(), expected.getPartitionName());
+        assertEquals(actual.getPath(), expected.getPath());
+        assertEquals(actual.getStart(), expected.getStart());
+        assertEquals(actual.getLength(), expected.getLength());
+        assertEquals(actual.getFileSize(), expected.getFileSize());
+        assertEquals(actual.getSchema(), expected.getSchema());
+        assertEquals(actual.getPartitionKeys(), expected.getPartitionKeys());
+        assertEquals(actual.getAddresses(), expected.getAddresses());
+        assertEquals(actual.getColumnCoercions(), expected.getColumnCoercions());
+        assertEquals(actual.getBucketConversion(), expected.getBucketConversion());
+        assertEquals(actual.isForceLocalScheduling(), expected.isForceLocalScheduling());
+        assertTrue(actual.getDeleteDetlaLocations().isPresent());
+        assertEquals(actual.getDeleteDetlaLocations().get(), expected.getDeleteDetlaLocations().get());
     }
 }

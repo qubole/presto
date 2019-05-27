@@ -250,6 +250,8 @@ public class HivePageSource
                         blocks.add(RunLengthEncodedBlock.create(types[fieldId], prefilledValues[fieldId], batchSize));
                         break;
                     case REGULAR:
+                    // GENERATED is a special case, it was not read from file but will be visible in output
+                    case GENERATED:
                         Block block = dataPage.getBlock(columnMapping.getIndex());
                         if (coercers[fieldId] != null) {
                             block = new LazyBlock(batchSize, new CoercionLazyBlockLoader(block, coercers[fieldId]));

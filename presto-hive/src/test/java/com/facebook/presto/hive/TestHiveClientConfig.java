@@ -108,7 +108,9 @@ public class TestHiveClientConfig
                 .setHdfsWireEncryptionEnabled(false)
                 .setPartitionStatisticsSampleSize(100)
                 .setCollectColumnStatisticsOnWrite(false)
-                .setHiveTxnHeartBeatInterval(new Duration(5, TimeUnit.SECONDS)));
+                .setHiveTxnHeartBeatInterval(new Duration(5, TimeUnit.SECONDS))
+                .setDeleteDeltaCacheSize(new DataSize(100, DataSize.Unit.MEGABYTE))
+                .setDeleteDeltaCacheTTL(new Duration(5, TimeUnit.MINUTES)));
     }
 
     @Test
@@ -186,6 +188,8 @@ public class TestHiveClientConfig
                 .put("hive.partition-statistics-sample-size", "1234")
                 .put("hive.collect-column-statistics-on-write", "true")
                 .put("hive.txn-heartbeat-interval", "10s")
+                .put("hive.delete-delta-cache-size", "1000MB")
+                .put("hive.delete-delta-cache-ttl", "15m")
                 .build();
 
         HiveClientConfig expected = new HiveClientConfig()
@@ -259,7 +263,9 @@ public class TestHiveClientConfig
                 .setHdfsWireEncryptionEnabled(true)
                 .setPartitionStatisticsSampleSize(1234)
                 .setCollectColumnStatisticsOnWrite(true)
-                .setHiveTxnHeartBeatInterval(new Duration(10, TimeUnit.SECONDS));
+                .setHiveTxnHeartBeatInterval(new Duration(10, TimeUnit.SECONDS))
+                .setDeleteDeltaCacheSize(new DataSize(1000, DataSize.Unit.MEGABYTE))
+                .setDeleteDeltaCacheTTL(new Duration(15, TimeUnit.MINUTES));
 
         ConfigAssertions.assertFullMapping(properties, expected);
     }
